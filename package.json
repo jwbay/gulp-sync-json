@@ -16,6 +16,7 @@
   "author": "justin.bay@outlook.com",
   "license": "MIT",
   "dependencies": {
-    "gulp": "^3.8.11"
+    "gulp": "^3.8.11",
+    "through2": "^0.6.5"
   }
 }
