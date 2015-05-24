@@ -1,0 +1,21 @@
+{
+  "name": "sync-json",
+  "version": "0.0.0",
+  "description": "Synchronize i18next translation file key structure against a primary source",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "tbd"
+  },
+  "keywords": [
+    "gulp-plugin"
+  ],
+  "author": "justin.bay@outlook.com",
+  "license": "MIT",
+  "dependencies": {
+    "gulp": "^3.8.11"
+  }
+}
