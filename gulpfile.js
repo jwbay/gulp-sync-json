@@ -1,22 +1,40 @@
 var gulp = require('gulp');
 var through = require('through2');
 
-function syncDirectory() {
-	var stream = through.obj(function(file, enc, cb) {
+function syncDirectory(primaryFile) {
+	var primary;
+	var others = [];
+	
+	function fileToJSON(file) {
 		var contents = file.contents.toString();
 		if (contents) {
-			var keys = JSON.parse(contents);
-			console.log(JSON.stringify(keys, true, 2));
+			return JSON.parse(contents);
+		} 
+		return {};
+	}
+	
+	function processFile(file, enc, cb) {
+		if (file.relative === primaryFile) {	
+			primary = fileToJSON(file); 
+		} else {
+			others.push(fileToJSON(file));
 		}
-		this.push(file);
 		cb();
-	});
+	}
+	
+	function endStream(cb) {
+		console.log('primary: ', JSON.stringify(primary));
+		console.log('others: ', JSON.stringify(others));
+		cb();
+	}
+	
+	var stream = through.obj(processFile, endStream);
 	
 	return stream;
 }
 
 gulp.task('default', function () {
-	gulp.src('./test/*.json')
-		.pipe(syncDirectory())
+	return gulp.src('./test/*.json')
+		.pipe(syncDirectory('en.json'))
 		.pipe(gulp.dest('./test/'));
 });
