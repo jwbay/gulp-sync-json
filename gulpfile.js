@@ -5,6 +5,10 @@ var through = require('through2');
 var PluginError = gutil.PluginError;
 var log = gutil.log;
 
+//TODO accept /**/*.json and group by directories containing the primary file
+//TODO accept include/exclude filename options
+//TODO clean task (re-serialize)
+
 'use strict';
 
 var pluginName = 'sync-l10n';
@@ -25,27 +29,15 @@ function syncDirectory(primaryFile) {
 	function processFiles(done) {
 		var _this = this;
 		var sourceKeys = bufferToObject(source.contents);
-		var resultMap = {};
-
 		source.contents = objectToBuffer(sourceKeys);
 		_this.push(source);
 
 		targets.forEach(function (target) {
 			var fileName = target.path.replace(target.cwd, '');
 			var targetKeys = bufferToObject(target.contents);
-			resultMap[target.path] = sync(sourceKeys, targetKeys, fileName);
+			var syncResult = sync(sourceKeys, targetKeys, fileName);
+			logSyncResult(syncResult, fileName);
 			target.contents = objectToBuffer(targetKeys);
-		});
-
-		targets.forEach(function(target) {
-			var fileName = target.path.replace(target.cwd, '');
-			var result = resultMap[target.path];
-			if (result.pushed.length) {
-				log('Pushed to', gutil.colors.cyan(fileName) + ':', getResultString(result.pushed));
-			}
-			if (result.removed.length) {
-				log('Removed from', gutil.colors.cyan(fileName) + ':', getResultString(result.removed));
-			}
 			_this.push(target);
 		});
 
@@ -63,7 +55,7 @@ function syncDirectory(primaryFile) {
 					target[key] = source[key];
 				} else {
 					target[key] = {};
-					var result = sync(source[key], target[key]);
+					var result = sync(source[key], target[key], fileName);
 					pushedKeys.push.apply(pushedKeys, result.pushed);
 					removedKeys.push.apply(removedKeys, result.removed);
 				}
@@ -74,20 +66,30 @@ function syncDirectory(primaryFile) {
 				}
 			}
 		});
-		
+
 		Object.keys(target).forEach(function (key) {
 			if (!source.hasOwnProperty(key)) {
 				delete target[key];
 				removedKeys.push(key);
 			}
 		});
-		
+
 		return {
 			pushed: pushedKeys,
 			removed: removedKeys
 		};
 	}
 	
+	function bufferToObject(buffer) {
+		var contents = buffer.toString();
+		return contents ? JSON.parse(contents) : {};
+	}
+
+	function objectToBuffer(object) {
+		var contents = JSON.stringify(object, null, 4);
+		return new Buffer(contents);
+	}
+
 	function makeTypeMismatchError(fileName, keyName, sourceValue, targetValue) {
 		return new PluginError(pluginName, [
 			'Type mismatch on key ',
@@ -100,21 +102,20 @@ function syncDirectory(primaryFile) {
 			gutil.colors.cyan(typeof targetValue)
 		].join(''));
 	}
-
-	function bufferToObject(buffer) {
-		var contents = buffer.toString();
-		return contents ? JSON.parse(contents) : {};
-	}
-
-	function objectToBuffer(object) {
-		var contents = JSON.stringify(object, null, 4);
-		return new Buffer(contents);
+	
+	function logSyncResult(syncResult, fileName) {
+		if (syncResult.pushed.length) {
+			log('Pushed to', gutil.colors.cyan(fileName) + ':', getResultString(syncResult.pushed));
+		}
+		if (syncResult.removed.length) {
+			log('Removed from', gutil.colors.cyan(fileName) + ':', getResultString(syncResult.removed));
+		}
 	}
 	
 	function stringifyKeyList(array) {
 		return array.map(function(key) {
 			return gutil.colors.cyan(key);
-		}).join(", ");
+		}).join(', ');
 	}
 	
 	function getResultString(keysArray) {
