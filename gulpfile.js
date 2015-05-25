@@ -6,6 +6,8 @@ var PluginError = gutil.PluginError;
 
 'use strict';
 
+var pluginName = 'sync-l10n';
+
 function syncDirectory(primaryFile) {
 	var source;
 	var targets = [];
@@ -42,7 +44,7 @@ function syncDirectory(primaryFile) {
 				}
 			} else {
 				if (typeof source[key] !== typeof target[key]) {
-					throw new PluginError('Type mismatch on key ' + key);
+					throw new PluginError(pluginName, 'Type mismatch on key "' + key + '"');
 				}
 			}
 		});
