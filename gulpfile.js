@@ -31,11 +31,12 @@ function syncDirectory(primaryFile) {
 		_this.push(source);
 
 		targets.forEach(function (target) {
+			var fileName = target.path.replace(target.cwd, '');
 			var targetKeys = bufferToObject(target.contents);
-			resultMap[target.path] = sync(sourceKeys, targetKeys);
+			resultMap[target.path] = sync(sourceKeys, targetKeys, fileName);
 			target.contents = objectToBuffer(targetKeys);
 		});
-		
+
 		targets.forEach(function(target) {
 			var fileName = target.path.replace(target.cwd, '');
 			var result = resultMap[target.path];
@@ -51,7 +52,7 @@ function syncDirectory(primaryFile) {
 		done();
 	}
 
-	function sync(source, target) {
+	function sync(source, target, fileName) {
 		var pushedKeys = [];
 		var removedKeys = [];
 		
@@ -63,12 +64,13 @@ function syncDirectory(primaryFile) {
 				} else {
 					target[key] = {};
 					var result = sync(source[key], target[key]);
-					[].push.apply(pushedKeys, result.pushed);
-					[].push.apply(removedKeys, result.removed);
+					pushedKeys.push.apply(pushedKeys, result.pushed);
+					removedKeys.push.apply(removedKeys, result.removed);
 				}
 			} else {
 				if (typeof source[key] !== typeof target[key]) {
-					throw new PluginError(pluginName, 'Type mismatch on key "' + key + '"');
+					var mismatchError = makeTypeMismatchError(fileName, key, source[key], target[key]);
+					throw mismatchError;
 				}
 			}
 		});
@@ -84,6 +86,19 @@ function syncDirectory(primaryFile) {
 			pushed: pushedKeys,
 			removed: removedKeys
 		};
+	}
+	
+	function makeTypeMismatchError(fileName, keyName, sourceValue, targetValue) {
+		return new PluginError(pluginName, [
+			'Type mismatch on key ',
+			gutil.colors.cyan(keyName),
+			' in file ',
+			gutil.colors.cyan(fileName),
+			'. Source type ',
+			gutil.colors.cyan(typeof sourceValue),
+			', target type ',
+			gutil.colors.cyan(typeof targetValue)
+		].join(''));
 	}
 
 	function bufferToObject(buffer) {
