@@ -6,7 +6,9 @@ var PluginError = gutil.PluginError;
 var log = gutil.log;
 
 //TODO accept /**/*.json and group by directories containing the primary file
+//TODO dry run/verification, throw errors instead of making changes
 //TODO accept include/exclude filename options
+//TODO guard cwd, opt-in option
 //TODO clean task (re-serialize)
 
 'use strict';
@@ -22,7 +24,7 @@ function syncDirectory(primaryFile) {
 			source = file;
 		} else {
 			targets.push(file);
-		}
+		}�
 		done();
 	}
 
@@ -47,7 +49,7 @@ function syncDirectory(primaryFile) {
 	function sync(source, target, fileName) {
 		var pushedKeys = [];
 		var removedKeys = [];
-		
+
 		Object.keys(source).forEach(function (key) {
 			if (!target.hasOwnProperty(key)) {
 				if (typeof source[key] === 'string') {
@@ -79,7 +81,7 @@ function syncDirectory(primaryFile) {
 			removed: removedKeys
 		};
 	}
-	
+
 	function bufferToObject(buffer) {
 		var contents = buffer.toString();
 		return contents ? JSON.parse(contents) : {};
@@ -102,7 +104,7 @@ function syncDirectory(primaryFile) {
 			gutil.colors.cyan(typeof targetValue)
 		].join(''));
 	}
-	
+
 	function logSyncResult(syncResult, fileName) {
 		if (syncResult.pushed.length) {
 			log('Pushed to', gutil.colors.cyan(fileName) + ':', getResultString(syncResult.pushed));
@@ -111,13 +113,7 @@ function syncDirectory(primaryFile) {
 			log('Removed from', gutil.colors.cyan(fileName) + ':', getResultString(syncResult.removed));
 		}
 	}
-	
-	function stringifyKeyList(array) {
-		return array.map(function(key) {
-			return gutil.colors.cyan(key);
-		}).join(', ');
-	}
-	
+
 	function getResultString(keysArray) {
 		if (keysArray.length <= 3) {
 			return stringifyKeyList(keysArray);
@@ -128,6 +124,12 @@ function syncDirectory(primaryFile) {
 			gutil.colors.magenta(keysArray.length - 3),
 			' more'
 		].join('');
+	}
+
+	function stringifyKeyList(array) {
+		return array.map(function(key) {
+			return gutil.colors.cyan(key);
+		}).join(', ');
 	}
 
 	return through.obj(addFiles, processFiles);
