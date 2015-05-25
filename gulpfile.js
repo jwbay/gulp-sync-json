@@ -1,8 +1,12 @@
+/* global Buffer */
 var gulp = require('gulp');
+var gutil = require('gulp-util');
 var through = require('through2');
+var PluginError = gutil.PluginError;
+
+'use strict';
 
 function syncDirectory(primaryFile) {
-	//todo: set .contents and push files back onto stream at the end of endStream
 	var source;
 	var targets = [];
 	
@@ -16,39 +20,42 @@ function syncDirectory(primaryFile) {
 	}
 	
 	function processFiles(done) {
-		var sourceKeys = fileToObject(source);
+		var sourceKeys = bufferToObject(source.contents);
 		var _this = this;
 		targets.forEach(function (target) {
-			var targetKeys = fileToObject(target);
-			syncKeys(sourceKeys, targetKeys);
+			var targetKeys = bufferToObject(target.contents);
+			sync(sourceKeys, targetKeys);
 			target.contents = objectToBuffer(targetKeys);
 			_this.push(target);
 		});
 		done();
 	}
 	
-	function syncKeys(source, target) {
-		var sourceKeys = Object.keys(source);
-		
-		sourceKeys.forEach(function (key) {
-			//TODO error if object and string share prop name
+	function sync(source, target) {
+		Object.keys(source).forEach(function (key) {
 			if (!target.hasOwnProperty(key)) {
 				if (typeof source[key] === 'string') {
 					target[key] = source[key];
 				} else {
 					target[key] = {};
-					syncKeys(source[key], target[key]);
+					sync(source[key], target[key]);
+				}
+			} else {
+				if (typeof source[key] !== typeof target[key]) {
+					throw new PluginError('Type mismatch on key ' + key);
 				}
 			}
 		});
-	}
+		Object.keys(target).forEach(function (key) {
+			if (!source.hasOwnProperty(key)) {
+				delete target[key];
+			}
+		});
+	}		
 	
-	function fileToObject(file) {
-		var contents = file.contents.toString();
-		if (contents) {
-			return JSON.parse(contents);
-		} 
-		return {};
+	function bufferToObject(buffer) {
+		var contents = buffer.toString();
+		return contents ? JSON.parse(contents) : {};
 	}
 
 	function objectToBuffer(object) {
@@ -56,9 +63,7 @@ function syncDirectory(primaryFile) {
 		return new Buffer(contents);
 	}
 	
-	
-	var stream = through.obj(addFiles, processFiles);
-	return stream;
+	return through.obj(addFiles, processFiles);
 }
 
 gulp.task('default', function () {
