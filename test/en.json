@@ -1,12 +1,12 @@
 {
-	"hello": "Hello",
-	"world": "World",
-	"sub": {
-		"more": "more",
-		"text": "text",
-		"nested": {
-			"another": "level"
-		}
-	},
-	"definitely": "not alphabetized"
+    "hello": "Hello",
+    "world": "World",
+    "sub": {
+        "more": "more",
+        "text": "text",
+        "nested": {
+            "another": "level"
+        }
+    },
+    "definitely": "not alphabetized"
 }

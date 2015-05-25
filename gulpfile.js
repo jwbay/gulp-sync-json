@@ -11,7 +11,7 @@ var pluginName = 'sync-l10n';
 function syncDirectory(primaryFile) {
 	var source;
 	var targets = [];
-	
+
 	function addFiles(file, enc, done) {
 		if (file.relative === primaryFile) {
 			source = file;
@@ -20,19 +20,25 @@ function syncDirectory(primaryFile) {
 		}
 		done();
 	}
-	
+
 	function processFiles(done) {
-		var sourceKeys = bufferToObject(source.contents);
 		var _this = this;
+		var sourceKeys = bufferToObject(source.contents);
+
+		//give source file the same re-serialization for whitespace as target files
+		source.contents = objectToBuffer(sourceKeys);
+		_this.push(source);
+
 		targets.forEach(function (target) {
 			var targetKeys = bufferToObject(target.contents);
 			sync(sourceKeys, targetKeys);
 			target.contents = objectToBuffer(targetKeys);
 			_this.push(target);
 		});
+
 		done();
 	}
-	
+
 	function sync(source, target) {
 		Object.keys(source).forEach(function (key) {
 			if (!target.hasOwnProperty(key)) {
@@ -53,8 +59,8 @@ function syncDirectory(primaryFile) {
 				delete target[key];
 			}
 		});
-	}		
-	
+	}
+
 	function bufferToObject(buffer) {
 		var contents = buffer.toString();
 		return contents ? JSON.parse(contents) : {};
@@ -64,7 +70,7 @@ function syncDirectory(primaryFile) {
 		var contents = JSON.stringify(object, null, 4);
 		return new Buffer(contents);
 	}
-	
+
 	return through.obj(addFiles, processFiles);
 }
 
