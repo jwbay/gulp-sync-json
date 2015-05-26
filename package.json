@@ -1,7 +1,7 @@
 {
-  "name": "sync-json",
-  "version": "0.0.0",
-  "description": "Synchronize i18next translation file key structure against a primary source",
+  "name": "gulp-sync-json",
+  "version": "1.0.0",
+  "description": "Synchronize JSON file key structures against a primary source",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -11,12 +11,13 @@
     "url": "tbd"
   },
   "keywords": [
-    "gulp-plugin"
+    "gulp-plugin",
+    "json",
+    "synchronize"
   ],
   "author": "justin.bay@outlook.com",
   "license": "MIT",
   "dependencies": {
-    "gulp": "^3.8.11",
     "gulp-util": "^3.0.4",
     "through2": "^0.6.5"
   }

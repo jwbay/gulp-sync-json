@@ -4,26 +4,24 @@ var gutil = require('gulp-util');
 var through = require('through2');
 var PluginError = gutil.PluginError;
 var log = gutil.log;
-
-//TODO accept include/exclude filename options
-//TODO guard cwd, opt-in option
-//TODO clean task (re-serialize)
-
 'use strict';
 
-var pluginName = 'sync-l10n';
+var pluginName = 'gulp-sync-json';
 var modes = {
 	write: 'write',
 	verify: 'verify'
 };
 
 module.exports = function(primaryFile, options) {
-	var directories = {}; // { [path: string]: { source: File, targets: File[] }
-	options = options || {};
-	var mode = options.verify ? modes.verify : modes.write;
+	var directories = {}; // { [path: string]: { source: Vinyl, targets: Vinyl[] }
+	var mode = (options || {}).verify ? modes.verify : modes.write;
 	var verificationFailed = false;
 
 	function addFiles(file, enc, done) {
+		if (file.isStream()) {
+			throw new PluginError(pluginName, 'Streams not supported');
+		}
+		
 		var directory = path.dirname(file.path);
 		var dir = directories[directory] = directories[directory] || {};
 		if (path.basename(file.path) === primaryFile) {

@@ -5,6 +5,6 @@ var syncJSON = require('./');
 
 gulp.task('default', function () {
 	return gulp.src('./**/*.json')
-		.pipe(syncJSON('en.json', { verify: false }))
+		.pipe(syncJSON('en.json'))
 		.pipe(gulp.dest('./'));
 });
