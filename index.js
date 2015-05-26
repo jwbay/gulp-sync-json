@@ -21,7 +21,7 @@ module.exports = function(primaryFile, options) {
 		if (file.isStream()) {
 			throw new PluginError(pluginName, 'Streams not supported');
 		}
-		
+
 		var directory = path.dirname(file.path);
 		var dir = directories[directory] = directories[directory] || {};
 		if (path.basename(file.path) === primaryFile) {
@@ -74,14 +74,26 @@ function sync(source, target, fileName) {
 
 	Object.keys(source).forEach(function (key) {
 		if (!target.hasOwnProperty(key)) {
-			if (typeof source[key] === 'string') {
-				pushedKeys.push(key);
-				target[key] = source[key];
-			} else {
-				target[key] = {};
-				var result = sync(source[key], target[key], fileName);
-				pushedKeys.push.apply(pushedKeys, result.pushed);
-				removedKeys.push.apply(removedKeys, result.removed);
+			switch (typeof source[key]) {
+				case 'string':
+				case 'boolean':
+				case 'number':
+					pushedKeys.push(key);
+					target[key] = source[key];
+					break;
+				case 'object':
+					if (source[key] === null || Array.isArray(source[key])) {
+						pushedKeys.push(key);
+						target[key] = source[key];
+						break;
+					}
+					target[key] = {};
+					var result = sync(source[key], target[key], fileName);
+					pushedKeys.push.apply(pushedKeys, result.pushed);
+					removedKeys.push.apply(removedKeys, result.removed);
+					break;
+				default:
+					break;
 			}
 		} else {
 			if (typeof source[key] !== typeof target[key]) {
