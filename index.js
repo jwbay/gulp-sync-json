@@ -52,17 +52,18 @@ module.exports = function(primaryFile, options) {
 
 	function processDirectory(source, targets, stream) {
 		var sourceKeys = bufferToObject(source.contents);
+		stream.push(source);
 		targets.forEach(function (target) {
 			var fileName = target.path.replace(target.cwd, '');
 			var targetKeys = bufferToObject(target.contents);
 			var syncResult = sync(sourceKeys, targetKeys, fileName);
 			logSyncResult(syncResult, fileName, mode);
 			if (mode === modes.write) {
-				target.contents = objectToBuffer(targetKeys);
-				stream.push(target);				
+				target.contents = objectToBuffer(targetKeys);			
 			} else if (syncResult.pushed.length || syncResult.removed.length) {
 				verificationFailed = true;
 			}
+			stream.push(target);
 		});
 	}
 
