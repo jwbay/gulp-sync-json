@@ -1,6 +1,4 @@
-/* global Buffer */
 var gulp = require('gulp');
-
 var syncJSON = require('./');
 
 gulp.task('default', function () {

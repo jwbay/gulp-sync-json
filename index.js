@@ -2,8 +2,10 @@
 var path = require('path');
 var gutil = require('gulp-util');
 var through = require('through2');
+var merge = require('merge');
 var PluginError = gutil.PluginError;
 var log = gutil.log;
+var colors = gutil.colors;
 'use strict';
 
 var pluginName = 'gulp-sync-json';
@@ -14,8 +16,12 @@ var modes = {
 
 module.exports = function(primaryFile, options) {
 	var directories = {}; // { [path: string]: { source: Vinyl, targets: Vinyl[] }
-	var mode = (options || {}).report ? modes.report : modes.write;
-	var verificationFailed = false;
+	options = merge({
+		report: false,
+		spaces: 4
+	}, options);
+	var mode = options.report ? modes.report : modes.write;
+	var reportFailure = false;
 
 	function addFiles(file, enc, done) {
 		if (file.isStream()) {
@@ -41,7 +47,7 @@ module.exports = function(primaryFile, options) {
 			if (!dir.targets || !dir.targets.length) { return; }
 			processDirectory(dir.source, dir.targets, stream);
 		});
-		if (mode === modes.report && verificationFailed) {
+		if (mode === modes.report && reportFailure) {
 			var verificationFailedError = new PluginError(pluginName, 'Verification failed: One or more JSON key structures not aligned');
 			throw verificationFailedError;
 		}
@@ -57,9 +63,9 @@ module.exports = function(primaryFile, options) {
 			var syncResult = sync(sourceKeys, targetKeys, fileName);
 			logSyncResult(syncResult, fileName, mode);
 			if (mode === modes.write) {
-				target.contents = objectToBuffer(targetKeys);			
+				target.contents = objectToBuffer(targetKeys, options.spaces);			
 			} else if (syncResult.pushed.length || syncResult.removed.length) {
-				verificationFailed = true;
+				reportFailure = true;
 			}
 			stream.push(target);
 		});
@@ -121,21 +127,21 @@ function bufferToObject(buffer) {
 	return contents ? JSON.parse(contents) : {};
 }
 
-function objectToBuffer(object) {
-	var contents = JSON.stringify(object, null, 4);
+function objectToBuffer(object, spaces) {
+	var contents = JSON.stringify(object, null, spaces);
 	return new Buffer(contents);
 }
 
 function makeTypeMismatchError(fileName, keyName, sourceValue, targetValue) {
 	return new PluginError(pluginName, [
 		'Type mismatch on key ',
-		gutil.colors.cyan(keyName),
+		colors.cyan(keyName),
 		' in file ',
-		gutil.colors.cyan(fileName),
+		colors.cyan(fileName),
 		'. Source type ',
-		gutil.colors.cyan(typeof sourceValue),
+		colors.cyan(typeof sourceValue),
 		', target type ',
-		gutil.colors.cyan(typeof targetValue)
+		colors.cyan(typeof targetValue)
 	].join(''));
 }
 
@@ -143,11 +149,11 @@ function logSyncResult(syncResult, fileName, mode) {
 	var prefix;
 	if (syncResult.pushed.length) {
 		prefix = mode === modes.write ? 'Pushed to' : 'Missing keys in';
-		log(prefix, gutil.colors.cyan(fileName) + ':', getResultString(syncResult.pushed));
+		log(prefix, colors.cyan(fileName) + ':', getResultString(syncResult.pushed));
 	}
 	if (syncResult.removed.length) {
 		prefix = mode === modes.write ? 'Removed from' : 'Orphaned keys found in';
-		log(prefix, gutil.colors.cyan(fileName) + ':', getResultString(syncResult.removed));
+		log(prefix, colors.cyan(fileName) + ':', getResultString(syncResult.removed));
 	}
 }
 
@@ -158,13 +164,13 @@ function getResultString(keysArray) {
 	return [
 		stringifyKeyList(keysArray.slice(0, 3)),
 		' and ',
-		gutil.colors.magenta(keysArray.length - 3),
+		colors.magenta(keysArray.length - 3),
 		' more'
 	].join('');
 }
 
 function stringifyKeyList(array) {
 	return array.map(function(key) {
-		return gutil.colors.cyan(key);
+		return colors.cyan(key);
 	}).join(', ');
 }
