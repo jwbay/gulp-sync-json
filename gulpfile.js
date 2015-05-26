@@ -1,5 +1,6 @@
 /* global Buffer */
 var gulp = require('gulp');
+var path = require('path');
 var gutil = require('gulp-util');
 var through = require('through2');
 var PluginError = gutil.PluginError;
@@ -15,24 +16,35 @@ var log = gutil.log;
 
 var pluginName = 'sync-l10n';
 
-function syncDirectory(primaryFile) {
-	var source;
-	var targets = [];
+function syncJSON(primaryFile) {
+	var directories = {}; // { [path: string]: { source: File, targets: File[] }
 
 	function addFiles(file, enc, done) {
-		if (file.relative === primaryFile) {
-			source = file;
+		var directory = path.dirname(file.path);
+		var dir = directories[directory] = directories[directory] || {};
+
+		if (path.basename(file.path) === primaryFile) {
+			dir.source = file;
 		} else {
-			targets.push(file);
-		}�
+			dir.targets = dir.targets || [];
+			dir.targets.push(file);
+		}
+		done();
+	}
+	
+	function processFiles(done) {
+		var stream = this;
+		Object.keys(directories).forEach(function(directory) {
+			var dir = directories[directory];
+			if (!dir.source) { return; }
+			if (!dir.targets || !dir.targets.length) { return; }
+			processDirectory(dir.source, dir.targets, stream);			
+		});
 		done();
 	}
 
-	function processFiles(done) {
-		var _this = this;
+	function processDirectory(source, targets, stream) {
 		var sourceKeys = bufferToObject(source.contents);
-		source.contents = objectToBuffer(sourceKeys);
-		_this.push(source);
 
 		targets.forEach(function (target) {
 			var fileName = target.path.replace(target.cwd, '');
@@ -40,10 +52,8 @@ function syncDirectory(primaryFile) {
 			var syncResult = sync(sourceKeys, targetKeys, fileName);
 			logSyncResult(syncResult, fileName);
 			target.contents = objectToBuffer(targetKeys);
-			_this.push(target);
+			stream.push(target);
 		});
-
-		done();
 	}
 
 	function sync(source, target, fileName) {
@@ -136,7 +146,7 @@ function syncDirectory(primaryFile) {
 }
 
 gulp.task('default', function () {
-	return gulp.src('./test/*.json')
-		.pipe(syncDirectory('en.json'))
-		.pipe(gulp.dest('./test/'));
+	return gulp.src('./**/*.json')
+		.pipe(syncJSON('en.json'))
+		.pipe(gulp.dest('./'));
 });
