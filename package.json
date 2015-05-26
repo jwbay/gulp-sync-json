@@ -8,10 +8,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "tbd"
+    "url": "https://github.com/jwbay/gulp-sync-json"
   },
   "keywords": [
-    "gulp-plugin",
+    "gulpplugin",
     "json",
     "synchronize"
   ],
