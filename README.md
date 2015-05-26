@@ -71,11 +71,11 @@ key structure for every other JSON file in the directory
 #### options
 An optional options object. The following properties are supported:
 
-* `report: boolean` - Default false. If set to `true`, the plugin will throw an
+* `report: boolean` - Default `false`. If set to `true`, the plugin will throw an
 error if any key mismatches are detected instead of fixing them on the
 filesystem. It will still log the mismatches. Intended for use as part of a
 CI/build server step
-* `spaces: number` - Default 4. How many spaces to use when formatting JSON.
+* `spaces: number` - Default `4`. How many spaces to use when formatting JSON.
 Passed directly to JSON.stringify
 
 ### Notes on behavior
