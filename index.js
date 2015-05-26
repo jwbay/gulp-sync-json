@@ -79,6 +79,7 @@ function sync(source, target, fileName) {
 	var removedKeys = [];
 
 	Object.keys(source).forEach(function (key) {
+		var result;
 		if (!target.hasOwnProperty(key)) {
 			switch (typeof source[key]) {
 				case 'string':
@@ -94,7 +95,7 @@ function sync(source, target, fileName) {
 						break;
 					}
 					target[key] = {};
-					var result = sync(source[key], target[key], fileName);
+					result = sync(source[key], target[key], fileName);
 					pushedKeys.push.apply(pushedKeys, result.pushed);
 					removedKeys.push.apply(removedKeys, result.removed);
 					break;
@@ -105,6 +106,13 @@ function sync(source, target, fileName) {
 			if (typeof source[key] !== typeof target[key]) {
 				var mismatchError = makeTypeMismatchError(fileName, key, source[key], target[key]);
 				throw mismatchError;
+			} else {
+				var o = source[key];
+				if (typeof o === 'object' && o !== null && !Array.isArray(o)) {
+					result = sync(source[key], target[key], fileName);
+					pushedKeys.push.apply(pushedKeys, result.pushed);
+					removedKeys.push.apply(removedKeys, result.removed);
+				}
 			}
 		}
 	});
