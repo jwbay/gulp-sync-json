@@ -9,12 +9,12 @@ var log = gutil.log;
 var pluginName = 'gulp-sync-json';
 var modes = {
 	write: 'write',
-	verify: 'verify'
+	report: 'report'
 };
 
 module.exports = function(primaryFile, options) {
 	var directories = {}; // { [path: string]: { source: Vinyl, targets: Vinyl[] }
-	var mode = (options || {}).verify ? modes.verify : modes.write;
+	var mode = (options || {}).report ? modes.report : modes.write;
 	var verificationFailed = false;
 
 	function addFiles(file, enc, done) {
@@ -41,7 +41,7 @@ module.exports = function(primaryFile, options) {
 			if (!dir.targets || !dir.targets.length) { return; }
 			processDirectory(dir.source, dir.targets, stream);
 		});
-		if (mode === modes.verify && verificationFailed) {
+		if (mode === modes.report && verificationFailed) {
 			var verificationFailedError = new PluginError(pluginName, 'Verification failed: One or more JSON key structures not aligned');
 			throw verificationFailedError;
 		}
