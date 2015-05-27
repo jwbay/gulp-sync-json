@@ -1,5 +1,5 @@
 # gulp-sync-json
-Synchronize JSON file key structures against a primary source
+[Gulp](http://gulpjs.com/) plugin for synchronizing JSON file key structures against a primary source
 
 ### What it's for
 This plugin can synchronize the key structures of JSON files. It must be
@@ -13,6 +13,9 @@ nested key structures as one would expect.
 * It cannot synchronize files across different directories.
 * It will not synchronize array structures, including objects inside arrays.
  Arrays are treated as primitives; only objects are recursed and processed.
+
+### License
+MIT License (Expat)
 
 ### Example
 Given these files:
@@ -71,7 +74,7 @@ key structure for every other JSON file in the directory
 #### options
 An optional options object. The following properties are supported:
 
-* `report: boolean` - Default `false`. If set to `true`, the plugin will throw an
+* `report: boolean` - Default `false`. If set to `true`, the plugin will emit an
 error if any key mismatches are detected instead of fixing them on the
 filesystem. It will still log the mismatches. Intended for use as part of a
 CI/build server step
@@ -91,3 +94,6 @@ the directory will be ignored
 files, the directory will be ignored
 * As a consequence of reserialization, all files touched besides the primary file
 are re-formatted
+
+Need to handle line endings differently? Pipe the results through 
+[gulp-eol](https://www.npmjs.com/package/gulp-eol).
