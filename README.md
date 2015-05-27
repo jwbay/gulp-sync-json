@@ -66,7 +66,7 @@ gulp.task('sync-json', function() {
 });
 ```
 
-## `syncJSON(primaryFile: string, options?: any) => NodeJS.ReadWriteStream`
+### `syncJSON(primaryFile: string, options?: any) => NodeJS.ReadWriteStream`
 
 #### primaryFile
 A filename, or the basename portion of a path, that is the source of truth for
