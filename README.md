@@ -13,7 +13,10 @@ nested key structures as one would expect.
 * It does not synchronize values. It only synchronizes keys.
 * It cannot synchronize files across different directories.
 * It will not synchronize array structures, including objects inside arrays.
- Arrays are treated as primitives; only objects are recursed and processed.
+Arrays are treated as primitives; only objects are recursed and processed.
+
+This plugin has no relation to
+[grunt-sync-json](https://www.npmjs.com/package/grunt-sync-json).
 
 ## License
 MIT License (Expat)
@@ -22,6 +25,7 @@ MIT License (Expat)
 Given these files:
 
 a.json
+
 ```json
 {
     "key_one": "value",
@@ -31,7 +35,9 @@ a.json
     }
 }
 ```
+
 b.json
+
 ```json
 {
     "key_two": 100,
@@ -41,8 +47,10 @@ b.json
     }
 }
 ```
+
 Running the plugin with a.json as the primary file will change b.json to the
 following:
+
 ```json
 {
     "key_one": "value",
