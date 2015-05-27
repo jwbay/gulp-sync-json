@@ -94,7 +94,7 @@ Passed directly to JSON.stringify
 * When the plugin encounters a key not present in the primary file, it will
 remove it
 * If a key is present in both a source and target file but the value types do
-not match, the plugin with emit an error with the file, key, and types. No
+not match, the plugin will emit an error with the file, key, and types. No
 changes will be written to the filesystem. If the plugin is in report mode,
 the error will be logged instead of emitted and the plugin will continue.
 
