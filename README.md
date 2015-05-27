@@ -55,6 +55,7 @@ following:
 
 ## Usage
 To make all JSON files within the cwd conform to an 'en.json' sibling file:
+
 ```javascript
 var gulp = require('gulp');
 var syncJSON = require('gulp-sync-json');
@@ -66,7 +67,11 @@ gulp.task('sync-json', function() {
 });
 ```
 
-### `syncJSON(primaryFile: string, options?: any) => NodeJS.ReadWriteStream`
+## API
+
+```typescript
+syncJSON(primaryFile: string, options?: any) => NodeJS.ReadWriteStream
+```
 
 #### primaryFile
 A filename, or the basename portion of a path, that is the source of truth for
