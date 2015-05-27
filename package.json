@@ -1,6 +1,6 @@
 {
   "name": "gulp-sync-json",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Synchronize JSON file key structures against a primary source",
   "main": "index.js",
   "scripts": {
