@@ -15,6 +15,10 @@ var modes = {
 };
 
 module.exports = function(primaryFile, options) {
+	if (!primaryFile) {
+		throw new PluginError(pluginName, 'Primary file is required');
+	}
+	
 	var directories = {}; // { [path: string]: { source: Vinyl, targets: Vinyl[] }
 	options = merge({
 		report: false,
@@ -25,7 +29,8 @@ module.exports = function(primaryFile, options) {
 
 	function addFiles(file, enc, done) {
 		if (file.isStream()) {
-			throw new PluginError(pluginName, 'Streams not supported');
+			this.emit('error', new PluginError(pluginName, 'Streams not supported'));
+			return done();
 		}
 
 		var directory = path.dirname(file.path);
@@ -48,8 +53,7 @@ module.exports = function(primaryFile, options) {
 			processDirectory(dir.source, dir.targets, stream);
 		});
 		if (mode === modes.report && reportFailure) {
-			var verificationFailedError = new PluginError(pluginName, 'Verification failed: One or more JSON key structures not aligned');
-			throw verificationFailedError;
+			stream.emit('error', new PluginError(pluginName, 'Report failed: One or more JSON key structures not aligned'));
 		}
 		done();
 	}
@@ -60,7 +64,7 @@ module.exports = function(primaryFile, options) {
 		targets.forEach(function (target) {
 			var fileName = target.path.replace(target.cwd, '');
 			var targetKeys = bufferToObject(target.contents);
-			var syncResult = sync(sourceKeys, targetKeys, fileName);
+			var syncResult = sync(sourceKeys, targetKeys, stream, fileName);
 			logSyncResult(syncResult, fileName, mode);
 			if (mode === modes.write) {
 				target.contents = objectToBuffer(targetKeys, options.spaces);			
@@ -70,65 +74,71 @@ module.exports = function(primaryFile, options) {
 			stream.push(target);
 		});
 	}
+	
+	function sync(source, target, stream, fileName) {
+		var pushedKeys = [];
+		var removedKeys = [];
+	
+		Object.keys(source).forEach(function (key) {
+			function recurse(key) {
+				var result = sync(source[key], target[key], stream, fileName);
+				pushedKeys.push.apply(pushedKeys, result.pushed);
+				removedKeys.push.apply(removedKeys, result.removed);
+			}
+			
+			if (!target.hasOwnProperty(key)) {
+				switch (typeof source[key]) {
+					case 'string':
+					case 'boolean':
+					case 'number':
+						pushedKeys.push(key);
+						target[key] = source[key];
+						break;
+					case 'object':
+						if (source[key] === null || Array.isArray(source[key])) {
+							pushedKeys.push(key);
+							target[key] = source[key];
+							break;
+						}
+						target[key] = {};
+						recurse(key);
+						break;
+					default:
+						break;
+				}
+			} else {
+				if (typeof source[key] !== typeof target[key]) {
+					var mismatchError = makeTypeMismatchError(fileName, key, source[key], target[key]);
+					if (mode === modes.write) {
+						stream.emit('error', mismatchError);
+					} else {
+						log(colors.red(mismatchError.message));
+					}
+				} else {
+					var o = source[key];
+					if (typeof o === 'object' && o !== null && !Array.isArray(o)) {
+						recurse(key);
+					}
+				}
+			}
+		});
+	
+		Object.keys(target).forEach(function (key) {
+			if (!source.hasOwnProperty(key)) {
+				delete target[key];
+				removedKeys.push(key);
+			}
+		});
+	
+		return {
+			pushed: pushedKeys,
+			removed: removedKeys
+		};
+	}
 
 	return through.obj(addFiles, processFiles);
 };
 
-function sync(source, target, fileName) {
-	var pushedKeys = [];
-	var removedKeys = [];
-
-	Object.keys(source).forEach(function (key) {
-		var result;
-		if (!target.hasOwnProperty(key)) {
-			switch (typeof source[key]) {
-				case 'string':
-				case 'boolean':
-				case 'number':
-					pushedKeys.push(key);
-					target[key] = source[key];
-					break;
-				case 'object':
-					if (source[key] === null || Array.isArray(source[key])) {
-						pushedKeys.push(key);
-						target[key] = source[key];
-						break;
-					}
-					target[key] = {};
-					result = sync(source[key], target[key], fileName);
-					pushedKeys.push.apply(pushedKeys, result.pushed);
-					removedKeys.push.apply(removedKeys, result.removed);
-					break;
-				default:
-					break;
-			}
-		} else {
-			if (typeof source[key] !== typeof target[key]) {
-				var mismatchError = makeTypeMismatchError(fileName, key, source[key], target[key]);
-				throw mismatchError;
-			} else {
-				var o = source[key];
-				if (typeof o === 'object' && o !== null && !Array.isArray(o)) {
-					result = sync(source[key], target[key], fileName);
-					pushedKeys.push.apply(pushedKeys, result.pushed);
-					removedKeys.push.apply(removedKeys, result.removed);
-				}
-			}
-		}
-	});
-
-	Object.keys(target).forEach(function (key) {
-		if (!source.hasOwnProperty(key)) {
-			delete target[key];
-			removedKeys.push(key);
-		}
-	});
-
-	return {
-		pushed: pushedKeys,
-		removed: removedKeys
-	};
-}
 
 function bufferToObject(buffer) {
 	var contents = buffer.toString();
