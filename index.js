@@ -113,6 +113,7 @@ module.exports = function(primaryFile, options) {
 						stream.emit('error', mismatchError);
 					} else {
 						log(colors.red(mismatchError.message));
+						reportFailure = true;
 					}
 				} else {
 					var o = source[key];
