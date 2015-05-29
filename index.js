@@ -48,9 +48,18 @@ module.exports = function(primaryFile, options) {
 		var stream = this;
 		Object.keys(directories).forEach(function(directory) {
 			var dir = directories[directory];
-			if (!dir.source) { return; }
-			if (!dir.targets || !dir.targets.length) { return; }
-			processDirectory(dir.source, dir.targets, stream);
+			if (dir.source && dir.targets && dir.targets.length > 0) {
+				processDirectory(dir.source, dir.targets, stream);	
+			} else {
+				if (dir.source) {
+					stream.push(dir.source);
+				}
+				if (dir.targets) {
+					dir.targets.forEach(function(file) {
+						stream.push(file);
+					});
+				}
+			}
 		});
 		if (mode === modes.report && reportFailure) {
 			stream.emit('error', new PluginError(pluginName, 'Report failed: One or more JSON key structures not aligned'));

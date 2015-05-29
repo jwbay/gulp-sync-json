@@ -111,8 +111,6 @@ the error will be logged instead of emitted and the plugin will continue.
 the directory's contents will be ignored
 * If a directory has a file that matches the primary filename but no other JSON
 files, the directory's contents will be ignored
-* Only files the plugin is concerned with are piped through the stream, so if a
-file is ignored via the rules above, it will not be passed downstream
 * As a consequence of reserialization, all files touched besides the primary
 file are re-formatted
 * This plugin strips any present [BOM](http://unicode.org/faq/utf_bom.html#BOM)
