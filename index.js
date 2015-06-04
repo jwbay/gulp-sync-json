@@ -166,8 +166,9 @@ module.exports = function(primaryFile, options) {
 			return null;
 		}
 
-		if (Object.prototype.toString.call(parsedContents) !== '[object Object]') {
-			var notObjectError = new PluginError(pluginName, name + ' is a JSON type that cannot be synced. Only objects are supported');
+		var typeName = getTypeName(parsedContents);
+		if (typeName !== 'Object') {
+			var notObjectError = new PluginError(pluginName, name + ' is a JSON type that cannot be synced: ' + typeName + '. Only Objects are supported');
 			log(colors.red(notObjectError.message));
 			reportError = notObjectError;
 			return null;
@@ -178,6 +179,11 @@ module.exports = function(primaryFile, options) {
 
 	return through.obj(addFiles, processFiles);
 };
+
+function getTypeName(o) {
+	var fullName = Object.prototype.toString.call(o);
+	return fullName.split(' ')[1].slice(0, -1); //[object Number] -> Number
+}
 
 function getName(file) {
 	return file.path.replace(file.cwd, '');
