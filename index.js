@@ -66,7 +66,7 @@ module.exports = function(primaryFile, options) {
 			var allMessages = reportErrors.map(function(e) {
 				return e.message;
 			}).join(os.EOL);
-			stream.emit('error', new PluginError(pluginName, 'Report failed: ' + os.EOL + allMessages));
+			stream.emit('error', new PluginError(pluginName, colors.red('Report failed: ') + os.EOL + allMessages));
 		}
 		done();
 	}
@@ -84,7 +84,7 @@ module.exports = function(primaryFile, options) {
 			if (mode === modes.write) {
 				target.contents = objectToBuffer(targetKeys, options.spaces);
 			} else if (syncResult.pushed.length || syncResult.removed.length) {
-				reportErrors.push(new PluginError(pluginName, name + ': key structure not aligned with primary'));
+				reportErrors.push(new PluginError(pluginName, colors.cyan(name) + ' contains unaligned key structure'));
 			}
 			stream.push(target);
 		});
@@ -158,14 +158,14 @@ module.exports = function(primaryFile, options) {
 				parsedContents = JSON.parse(contents);
 			}
 		} catch (error) {
-			var jsonError = new PluginError(pluginName, name + ' contains invalid JSON');
+			var jsonError = new PluginError(pluginName, colors.cyan(name) + ' contains invalid JSON');
 			handleError(jsonError, stream);
 			return null;
 		}
 
 		var typeName = getTypeName(parsedContents);
 		if (typeName !== 'Object') {
-			var notObjectError = new PluginError(pluginName, name + ' is a JSON type that cannot be synced: ' + typeName + '. Only Objects are supported');
+			var notObjectError = new PluginError(pluginName, colors.cyan(name) + ' is a JSON type that cannot be synced: ' + colors.cyan(typeName) + '. Only Objects are supported');
 			handleError(notObjectError, stream);
 			return null;
 		}
@@ -200,10 +200,9 @@ function objectToBuffer(object, spaces) {
 
 function makeTypeMismatchError(fileName, keyName, sourceValue, targetValue) {
 	return new PluginError(pluginName, [
-		'Type mismatch on key ',
-		colors.cyan(keyName),
-		' in file ',
 		colors.cyan(fileName),
+		' contains type mismatch on key ',
+		colors.cyan(keyName),
 		'. Source type ',
 		colors.cyan(typeof sourceValue),
 		', target type ',
