@@ -25,7 +25,7 @@ module.exports = function(primaryFile, options) {
 		spaces: 4
 	}, options);
 	var mode = options.report ? modes.report : modes.write;
-	var reportFailure = false;
+	var reportError = null;
 
 	function addFiles(file, enc, done) {
 		if (file.isStream()) {
@@ -61,8 +61,8 @@ module.exports = function(primaryFile, options) {
 				}
 			}
 		});
-		if (mode === modes.report && reportFailure) {
-			stream.emit('error', new PluginError(pluginName, 'Report failed: One or more JSON key structures not aligned'));
+		if (mode === modes.report && reportError) {
+			stream.emit('error', reportError);
 		}
 		done();
 	}
@@ -78,7 +78,7 @@ module.exports = function(primaryFile, options) {
 			if (mode === modes.write) {
 				target.contents = objectToBuffer(targetKeys, options.spaces);			
 			} else if (syncResult.pushed.length || syncResult.removed.length) {
-				reportFailure = true;
+				reportError = makeKeyMismatchError();
 			}
 			stream.push(target);
 		});
@@ -117,12 +117,12 @@ module.exports = function(primaryFile, options) {
 				}
 			} else {
 				if (typeof source[key] !== typeof target[key]) {
-					var mismatchError = makeTypeMismatchError(fileName, key, source[key], target[key]);
+					var typeMismatchError = makeTypeMismatchError(fileName, key, source[key], target[key]);
 					if (mode === modes.write) {
-						stream.emit('error', mismatchError);
+						stream.emit('error', typeMismatchError);
 					} else {
-						log(colors.red(mismatchError.message));
-						reportFailure = true;
+						log(colors.red(typeMismatchError.message));
+						reportError = typeMismatchError;
 					}
 				} else {
 					var o = source[key];
@@ -171,6 +171,10 @@ function makeTypeMismatchError(fileName, keyName, sourceValue, targetValue) {
 		', target type ',
 		colors.cyan(typeof targetValue)
 	].join(''));
+}
+
+function makeKeyMismatchError() {
+	return new PluginError(pluginName, 'Report failed: One or more JSON key structures not aligned')
 }
 
 function logSyncResult(syncResult, fileName, mode) {
