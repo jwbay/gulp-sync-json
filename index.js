@@ -3,6 +3,7 @@ var path = require('path');
 var gutil = require('gulp-util');
 var through = require('through2');
 var merge = require('merge');
+var os = require('os');
 var PluginError = gutil.PluginError;
 var log = gutil.log;
 var colors = gutil.colors;
@@ -25,7 +26,7 @@ module.exports = function(primaryFile, options) {
 		spaces: 4
 	}, options);
 	var mode = options.report ? modes.report : modes.write;
-	var reportError = null;
+	var reportErrors = [];
 
 	function addFiles(file, enc, done) {
 		if (file.isStream()) {
@@ -61,26 +62,29 @@ module.exports = function(primaryFile, options) {
 				}
 			}
 		});
-		if (mode === modes.report && reportError) {
-			stream.emit('error', reportError);
+		if (mode === modes.report && reportErrors.length) {
+			var allMessages = reportErrors.map(function(e) {
+				return e.message;
+			}).join(os.EOL);
+			stream.emit('error', new PluginError(pluginName, 'Report failed: ' + os.EOL + allMessages));
 		}
 		done();
 	}
 
 	function processDirectory(source, targets, stream) {
-		var sourceKeys = fileToObject(source);
+		var sourceKeys = fileToObject(source, stream);
 		if (sourceKeys === null) { return; }
 		stream.push(source);
 		targets.forEach(function (target) {
 			var name = getName(target);
-			var targetKeys = fileToObject(target);
+			var targetKeys = fileToObject(target, stream);
 			if (targetKeys === null) { return; }
 			var syncResult = sync(sourceKeys, targetKeys, stream, name);
 			logSyncResult(syncResult, name, mode);
 			if (mode === modes.write) {
-				target.contents = objectToBuffer(targetKeys, options.spaces);			
+				target.contents = objectToBuffer(targetKeys, options.spaces);
 			} else if (syncResult.pushed.length || syncResult.removed.length) {
-				reportError = makeKeyMismatchError();
+				reportErrors.push(new PluginError(pluginName, name + ': key structure not aligned with primary'));
 			}
 			stream.push(target);
 		});
@@ -120,15 +124,9 @@ module.exports = function(primaryFile, options) {
 			} else {
 				if (typeof source[key] !== typeof target[key]) {
 					var typeMismatchError = makeTypeMismatchError(name, key, source[key], target[key]);
-					if (mode === modes.write) {
-						stream.emit('error', typeMismatchError);
-					} else {
-						log(colors.red(typeMismatchError.message));
-						reportError = typeMismatchError;
-					}
+					handleError(typeMismatchError, stream);
 				} else {
-					var o = source[key];
-					if (typeof o === 'object' && o !== null && !Array.isArray(o)) {
+					if (getTypeName(source[key]) === 'Object') {
 						recurse(key);
 					}
 				}
@@ -148,7 +146,7 @@ module.exports = function(primaryFile, options) {
 		};
 	}
 
-	function fileToObject(file) {
+	function fileToObject(file, stream) {
 		var name = getName(file);
 		var parsedContents;
 		
@@ -161,20 +159,26 @@ module.exports = function(primaryFile, options) {
 			}
 		} catch (error) {
 			var jsonError = new PluginError(pluginName, name + ' contains invalid JSON');
-			log(colors.red(jsonError.message));
-			reportError = jsonError;
+			handleError(jsonError, stream);
 			return null;
 		}
 
 		var typeName = getTypeName(parsedContents);
 		if (typeName !== 'Object') {
 			var notObjectError = new PluginError(pluginName, name + ' is a JSON type that cannot be synced: ' + typeName + '. Only Objects are supported');
-			log(colors.red(notObjectError.message));
-			reportError = notObjectError;
+			handleError(notObjectError, stream);
 			return null;
 		}
 
 		return parsedContents;
+	}
+	
+	function handleError(error, stream) {
+		if (mode === modes.write) {
+			stream.emit('error', error);
+		} else {
+			reportErrors.push(error);
+		}
 	}
 
 	return through.obj(addFiles, processFiles);
@@ -205,10 +209,6 @@ function makeTypeMismatchError(fileName, keyName, sourceValue, targetValue) {
 		', target type ',
 		colors.cyan(typeof targetValue)
 	].join(''));
-}
-
-function makeKeyMismatchError() {
-	return new PluginError(pluginName, 'Report failed: One or more JSON key structures not aligned');
 }
 
 function logSyncResult(syncResult, fileName, mode) {
