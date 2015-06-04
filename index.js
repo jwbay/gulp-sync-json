@@ -72,11 +72,11 @@ module.exports = function(primaryFile, options) {
 		if (sourceKeys === null) { return; }
 		stream.push(source);
 		targets.forEach(function (target) {
-			var fileName = target.path.replace(target.cwd, '');
+			var name = getName(target);
 			var targetKeys = fileToObject(target);
 			if (targetKeys === null) { return; }
-			var syncResult = sync(sourceKeys, targetKeys, stream, fileName);
-			logSyncResult(syncResult, fileName, mode);
+			var syncResult = sync(sourceKeys, targetKeys, stream, name);
+			logSyncResult(syncResult, name, mode);
 			if (mode === modes.write) {
 				target.contents = objectToBuffer(targetKeys, options.spaces);			
 			} else if (syncResult.pushed.length || syncResult.removed.length) {
@@ -86,13 +86,13 @@ module.exports = function(primaryFile, options) {
 		});
 	}
 	
-	function sync(source, target, stream, fileName) {
+	function sync(source, target, stream, name) {
 		var pushedKeys = [];
 		var removedKeys = [];
 	
 		Object.keys(source).forEach(function (key) {
 			function recurse(key) {
-				var result = sync(source[key], target[key], stream, fileName);
+				var result = sync(source[key], target[key], stream, name);
 				pushedKeys.push.apply(pushedKeys, result.pushed);
 				removedKeys.push.apply(removedKeys, result.removed);
 			}
@@ -119,7 +119,7 @@ module.exports = function(primaryFile, options) {
 				}
 			} else {
 				if (typeof source[key] !== typeof target[key]) {
-					var typeMismatchError = makeTypeMismatchError(fileName, key, source[key], target[key]);
+					var typeMismatchError = makeTypeMismatchError(name, key, source[key], target[key]);
 					if (mode === modes.write) {
 						stream.emit('error', typeMismatchError);
 					} else {
@@ -149,6 +149,7 @@ module.exports = function(primaryFile, options) {
 	}
 
 	function fileToObject(file) {
+		var name = getName(file);
 		var parsedContents;
 		
 		try {
@@ -159,14 +160,14 @@ module.exports = function(primaryFile, options) {
 				parsedContents = JSON.parse(contents);
 			}
 		} catch (error) {
-			var jsonError = new PluginError(pluginName, path.basename(file.path) + ' contains invalid JSON');
+			var jsonError = new PluginError(pluginName, name + ' contains invalid JSON');
 			log(colors.red(jsonError.message));
 			reportError = jsonError;
 			return null;
 		}
 
 		if (Object.prototype.toString.call(parsedContents) !== '[object Object]') {
-			var notObjectError = new PluginError(pluginName, path.basename(file.path) + ' is a JSON type that cannot be synced. Only objects are supported');
+			var notObjectError = new PluginError(pluginName, name + ' is a JSON type that cannot be synced. Only objects are supported');
 			log(colors.red(notObjectError.message));
 			reportError = notObjectError;
 			return null;
@@ -177,6 +178,10 @@ module.exports = function(primaryFile, options) {
 
 	return through.obj(addFiles, processFiles);
 };
+
+function getName(file) {
+	return file.path.replace(file.cwd, '');
+}
 
 function objectToBuffer(object, spaces) {
 	var contents = JSON.stringify(object, null, spaces);
@@ -197,7 +202,7 @@ function makeTypeMismatchError(fileName, keyName, sourceValue, targetValue) {
 }
 
 function makeKeyMismatchError() {
-	return new PluginError(pluginName, 'Report failed: One or more JSON key structures not aligned')
+	return new PluginError(pluginName, 'Report failed: One or more JSON key structures not aligned');
 }
 
 function logSyncResult(syncResult, fileName, mode) {
