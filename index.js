@@ -68,11 +68,13 @@ module.exports = function(primaryFile, options) {
 	}
 
 	function processDirectory(source, targets, stream) {
-		var sourceKeys = bufferToObject(source.contents);
+		var sourceKeys = fileToObject(source);
+		if (sourceKeys === null) { return; }
 		stream.push(source);
 		targets.forEach(function (target) {
 			var fileName = target.path.replace(target.cwd, '');
-			var targetKeys = bufferToObject(target.contents);
+			var targetKeys = fileToObject(target);
+			if (targetKeys === null) { return; }
 			var syncResult = sync(sourceKeys, targetKeys, stream, fileName);
 			logSyncResult(syncResult, fileName, mode);
 			if (mode === modes.write) {
@@ -146,14 +148,35 @@ module.exports = function(primaryFile, options) {
 		};
 	}
 
+	function fileToObject(file) {
+		var parsedContents;
+		
+		try {
+			var contents = file.contents.toString().trim();
+			if (!contents) {
+				parsedContents = {};
+			} else {
+				parsedContents = JSON.parse(contents);
+			}
+		} catch (error) {
+			var jsonError = new PluginError(pluginName, path.basename(file.path) + ' contains invalid JSON');
+			log(colors.red(jsonError.message));
+			reportError = jsonError;
+			return null;
+		}
+
+		if (Object.prototype.toString.call(parsedContents) !== '[object Object]') {
+			var notObjectError = new PluginError(pluginName, path.basename(file.path) + ' is a JSON type that cannot be synced. Only objects are supported');
+			log(colors.red(notObjectError.message));
+			reportError = notObjectError;
+			return null;
+		}
+
+		return parsedContents;
+	}
+
 	return through.obj(addFiles, processFiles);
 };
-
-
-function bufferToObject(buffer) {
-	var contents = buffer.toString();
-	return contents ? JSON.parse(contents) : {};
-}
 
 function objectToBuffer(object, spaces) {
 	var contents = JSON.stringify(object, null, spaces);
