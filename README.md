@@ -88,10 +88,11 @@ key structure for every other JSON file in the directory
 #### options
 An optional options object. The following properties are supported:
 
-* `report: boolean` - Default `false`. If set to `true`, the plugin will emit an
-error if any key mismatches are detected instead of fixing them on the
-filesystem. It will still log the mismatches. Intended for use as part of a
-CI/build server step
+* `report: boolean` - Default `false`. If set to `true`, the plugin will audit
+files instead of changing them on the filesystem. Any key mismatches will be
+logged instead of fixed, and any errors concerning invalid/unsupported JSON
+are supressed and logged instead of being emitted onto the stream. Especially
+valuable as part of a CI/build server step
 * `spaces: number` - Default `4`. How many spaces to use when formatting JSON.
 Passed directly to JSON.stringify
 
@@ -102,19 +103,12 @@ Passed directly to JSON.stringify
 * When the plugin encounters a key not present in the primary file, it will
 remove it
 * If a key is present in both a source and target file but the value types do
-not match, the plugin will emit an error with the file, key, and types. No
-changes will be written to the filesystem. If the plugin is in report mode,
-the error will be logged instead of emitted and the plugin will continue.
+not match, the plugin will emit an error with the file, key, and types
 
 #### Files
-* If a directory has JSON files but no filename matches the primary filename,
-the directory's contents will be ignored
-* If a directory has a file that matches the primary filename but no other JSON
-files, the directory's contents will be ignored
-* As a consequence of reserialization, all files touched besides the primary
-file are re-formatted
-* This plugin strips any present [BOM](http://unicode.org/faq/utf_bom.html#BOM)
-from files it touches
+* The plugin only cares about files in directories with both a primary file and
+other files present. Any files in the stream that aren't in such a directory
+are piped through untouched
 
 Need to handle line endings differently? Pipe the results through 
 [gulp-eol](https://www.npmjs.com/package/gulp-eol).
