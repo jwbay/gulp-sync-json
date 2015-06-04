@@ -78,7 +78,10 @@ gulp.task('sync-json', function() {
 ## API
 
 ```typescript
-syncJSON(primaryFile: string, options?: any) => NodeJS.ReadWriteStream
+syncJSON(primaryFile: string, options?: {
+    report: boolean,
+    spaces: number
+})
 ```
 
 #### primaryFile
@@ -88,12 +91,12 @@ key structure for every other JSON file in the directory
 #### options
 An optional options object. The following properties are supported:
 
-* `report: boolean` - Default `false`. If set to `true`, the plugin will audit
+* `report` - Default `false`. If set to `true`, the plugin will audit
 files instead of changing them on the filesystem. Any key mismatches will be
 logged instead of fixed, and any errors concerning invalid/unsupported JSON
 are supressed and logged instead of being emitted onto the stream. Especially
 valuable as part of a CI/build server step
-* `spaces: number` - Default `4`. How many spaces to use when formatting JSON.
+* `spaces` - Default `4`. How many spaces to use when formatting JSON.
 Passed directly to JSON.stringify
 
 ## Notes on behavior
