@@ -92,10 +92,12 @@ key structure for every other JSON file in the directory
 An optional options object. The following properties are supported:
 
 * `report` - Default `false`. If set to `true`, the plugin will audit
-files instead of changing them on the filesystem. Any key mismatches will be
-logged instead of fixed, and any errors concerning invalid/unsupported JSON
-are supressed and logged instead of being emitted onto the stream. Especially
-valuable as part of a CI/build server step
+files instead of changing them on the filesystem. Key mismatches are
+treated as errors, and all errors, including invalid/unsupported JSON,
+are supressed and collected instead of being emitted onto the stream
+as they occur. If the audit finds anything it emits a single error
+event at the end with each error message listed. Especially valuable
+as part of a CI/build server step
 * `spaces` - Default `4`. How many spaces to use when formatting JSON.
 Passed directly to JSON.stringify
 
