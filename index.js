@@ -1,3 +1,4 @@
+'use strict';
 /* global Buffer */
 var path = require('path');
 var gutil = require('gulp-util');
@@ -7,7 +8,6 @@ var os = require('os');
 var PluginError = gutil.PluginError;
 var log = gutil.log;
 var colors = gutil.colors;
-'use strict';
 
 var pluginName = 'gulp-sync-json';
 var modes = {
