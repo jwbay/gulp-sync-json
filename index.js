@@ -62,11 +62,12 @@ module.exports = function(primaryFile, options) {
 				}
 			}
 		});
-		if (mode === modes.report && reportErrors.length) {
+		if (mode === modes.report && reportErrors.length > 0) {
 			var allMessages = reportErrors.map(function(e) {
 				return e.message;
 			}).join(os.EOL);
-			stream.emit('error', new PluginError(pluginName, colors.red('Report failed: ') + os.EOL + allMessages));
+			log(colors.cyan(pluginName), " report found the following:" + os.EOL + allMessages);
+			stream.emit('error', new PluginError(pluginName, colors.red('Report failed')));
 		}
 		done();
 	}

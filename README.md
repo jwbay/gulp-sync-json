@@ -95,8 +95,8 @@ An optional options object. The following properties are supported:
 files instead of changing them on the filesystem. Key mismatches are
 treated as errors, and all errors, including invalid/unsupported JSON,
 are supressed and collected instead of being emitted onto the stream
-as they occur. If the audit finds anything it emits a single error
-event at the end with each error message listed. Especially valuable
+as they occur. If the audit finds anything it will log everything out
+at the end then emit one error onto the stream. Especially valuable
 as part of a CI/build server step
 * `spaces` - Default `4`. How many spaces to use when formatting JSON.
 Passed directly to JSON.stringify
