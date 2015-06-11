@@ -1,11 +1,14 @@
 /* global __dirname, Buffer, describe, it*/
 var gulp = require('gulp');
+var gutil = require('gulp-util');
 var assert = require('stream-assert');
 var path = require('path');
 var should = require('should');
 var syncJSON = require('../');
 var test = require('./test-stream');
 require('mocha');
+
+var chalk = gutil.colors;
 
 function contentsAre(obj) {
 	return function(file) {
@@ -172,5 +175,116 @@ describe('gulp-sync-json', function () {
 			.pipe(syncJSON('file0.json'))
 			.pipe(assert.second(contentsAre(target)))
 			.pipe(assert.end(done));
+	});
+	
+	it('should sync multiple targets', function (done) {
+		var primary = {
+			one: 1
+		};
+		var targetOne = {
+			gone: 0
+		};
+		var targetTwo = {
+			one: 2
+		};
+		var targetThree = {
+			one: 3,
+			gone: 0	
+		};
+		test(primary, targetOne, targetTwo, targetThree)
+			.pipe(syncJSON('file0.json'))
+			.pipe(assert.second(contentsAre(primary)))
+			.pipe(assert.nth(2, contentsAre({
+				one: 2
+			})))
+			.pipe(assert.nth(3, contentsAre({
+				one: 3
+			})))
+			.pipe(assert.end(done));
+	});
+	
+	it('should push to empty objects', function (done) {
+		var primary = { one: 1 };
+		test(primary, {})
+			.pipe(syncJSON('file0.json'))
+			.pipe(assert.second(contentsAre(primary)))
+			.pipe(assert.end(done));
+	});
+	
+	it('should push to empty files', function (done) {
+		var primary = { one: 1 };
+		test(primary, "")
+			.pipe(syncJSON('file0.json'))
+			.pipe(assert.second(contentsAre(primary)))
+			.pipe(assert.end(done));
+	});
+	
+	it('should push to whitespace files', function (done) {
+		var primary = { one: 1 };
+		test(primary, " \r\n \t ")
+			.pipe(syncJSON('file0.json'))
+			.pipe(assert.second(contentsAre(primary)))
+			.pipe(assert.end(done));
+	});
+	
+	it('should error when trying to sync against an array', function(done) {
+		var primary = { one: 1 };
+		test(primary, [0, 1])
+			.pipe(syncJSON('file0.json'))
+			.on('error', function (err) {
+				chalk.stripColor(err.message).should.endWith('is a JSON type that cannot be synced: Array. Only Objects are supported');
+				done();
+	        });
+	});
+	
+	it('should error when trying to sync against a number', function(done) {
+		var primary = { one: 1 };
+		test(primary, 42)
+			.pipe(syncJSON('file0.json'))
+			.on('error', function (err) {
+				chalk.stripColor(err.message).should.endWith('is a JSON type that cannot be synced: Number. Only Objects are supported');
+				done();
+	        });
+	});
+	
+	it('should error when trying to sync against a string', function(done) {
+		var primary = { one: 1 };
+		test(primary, "\"hello world\"")
+			.pipe(syncJSON('file0.json'))
+			.on('error', function (err) {
+				chalk.stripColor(err.message).should.endWith('is a JSON type that cannot be synced: String. Only Objects are supported');
+				done();
+	        });
+	});
+	
+	it('should error when trying to sync against a boolean', function(done) {
+		var primary = { one: 1 };
+		test(primary, true)
+			.pipe(syncJSON('file0.json'))
+			.on('error', function (err) {
+				chalk.stripColor(err.message).should.endWith('is a JSON type that cannot be synced: Boolean. Only Objects are supported');
+				done();
+	        });
+	});
+		
+	it('should error when trying to sync against null', function(done) {
+		var primary = { one: 1 };
+		test(primary, null)
+			.pipe(syncJSON('file0.json'))
+			.on('error', function (err) {
+				chalk.stripColor(err.message).should.endWith('is a JSON type that cannot be synced: Null. Only Objects are supported');
+				done();
+	        });
+	});
+
+	it('should error when types are mismatched on matching keys', function(done) {
+		var primary = { badKey: 1 };
+		var target = { badKey: "two" }
+		test(primary, target)
+			.pipe(syncJSON('file0.json'))
+			.on('error', function (err) {
+				chalk.stripColor(err.message).should.endWith('contains type mismatch on key badKey. Source type number, target type string');
+				done();
+	        });
 	});
 });
