@@ -1,4 +1,4 @@
-# gulp-sync-json
+# gulp-sync-json [![NPM version][npm-image]][npm-url] [![Build Status][travis-image]][travis-url]
 [Gulp](http://gulpjs.com/) plugin for synchronizing JSON file key structures
 against a primary source
 
@@ -120,3 +120,8 @@ are piped through untouched
 
 Need to handle line endings differently? Pipe the results through 
 [gulp-eol](https://www.npmjs.com/package/gulp-eol).
+
+[npm-url]: https://npmjs.org/package/gulp-sync-json
+[npm-image]: http://img.shields.io/npm/v/gulp-sync-json.svg?style=flat
+[travis-url]: https://travis-ci.org/jwbay/gulp-sync-json
+[travis-image]: https://travis-ci.org/jwbay/gulp-sync-json.svg?branch=master
