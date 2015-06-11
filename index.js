@@ -23,7 +23,8 @@ module.exports = function(primaryFile, options) {
 	var directories = {}; // { [path: string]: { source: Vinyl, targets: Vinyl[] }
 	options = merge({
 		report: false,
-		spaces: 4
+		spaces: 4,
+		verbose: false
 	}, options);
 	var mode = options.report ? modes.report : modes.write;
 	var reportErrors = [];
@@ -81,7 +82,9 @@ module.exports = function(primaryFile, options) {
 			var targetKeys = fileToObject(target, stream);
 			if (targetKeys === null) { return; }
 			var syncResult = sync(sourceKeys, targetKeys, stream, name);
-			logSyncResult(syncResult, name, mode);
+			if (options.verbose) {
+				logSyncResult(syncResult, name, mode);
+			}
 			if (mode === modes.write) {
 				target.contents = objectToBuffer(targetKeys, options.spaces);
 			} else if (syncResult.pushed.length || syncResult.removed.length) {
@@ -90,18 +93,18 @@ module.exports = function(primaryFile, options) {
 			stream.push(target);
 		});
 	}
-	
+
 	function sync(source, target, stream, name) {
 		var pushedKeys = [];
 		var removedKeys = [];
-	
+
 		Object.keys(source).forEach(function (key) {
 			function recurse(key) {
 				var result = sync(source[key], target[key], stream, name);
 				pushedKeys.push.apply(pushedKeys, result.pushed);
 				removedKeys.push.apply(removedKeys, result.removed);
 			}
-			
+
 			if (!target.hasOwnProperty(key)) {
 				switch (typeof source[key]) {
 					case 'string':
@@ -133,14 +136,14 @@ module.exports = function(primaryFile, options) {
 				}
 			}
 		});
-	
+
 		Object.keys(target).forEach(function (key) {
 			if (!source.hasOwnProperty(key)) {
 				delete target[key];
 				removedKeys.push(key);
 			}
 		});
-	
+
 		return {
 			pushed: pushedKeys,
 			removed: removedKeys
@@ -150,7 +153,7 @@ module.exports = function(primaryFile, options) {
 	function fileToObject(file, stream) {
 		var name = getName(file);
 		var parsedContents;
-		
+
 		try {
 			var contents = file.contents.toString().trim();
 			if (!contents) {
@@ -173,7 +176,7 @@ module.exports = function(primaryFile, options) {
 
 		return parsedContents;
 	}
-	
+
 	function handleError(error, stream) {
 		if (mode === modes.write) {
 			stream.emit('error', error);
