@@ -100,6 +100,9 @@ at the end then emit one error onto the stream. Especially valuable
 as part of a CI/build server step
 * `spaces` - Default `4`. How many spaces to use when formatting JSON.
 Passed directly to JSON.stringify
+* `verbose` - Default `false`. If set to `true`, the plugin will
+log out a summary of key additions and removals as it processes each
+file
 
 ## Notes on behavior
 
