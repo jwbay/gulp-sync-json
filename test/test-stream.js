@@ -2,6 +2,8 @@
 var array = require('stream-array');
 var File = require('gulp-util').File;
 
+//Nifty wrapper for unit testing Vinyl streams by floatdrop
+//https://github.com/wearefractal/gulp-concat/commit/eccffa49896a98c2527e3fd5445470918c05a2ca
 module.exports = function () {
   var args = Array.prototype.slice.call(arguments);
 

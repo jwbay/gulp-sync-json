@@ -28,9 +28,9 @@ describe('gulp-sync-json', function () {
 			gulp.src(path.join(__dirname, 'test-stream.js'), { buffer: false })
 				.pipe(syncJSON('fake.json'))
 				.on('error', function (err) {
-				err.message.should.eql('Streams not supported');
-				done();
-			});
+					err.message.should.eql('Streams not supported');
+					done();
+				});
 		});
 	});
 
@@ -330,11 +330,6 @@ describe('gulp-sync-json', function () {
 			var target = { one: 2 };
 			test(primary, target)
 				.pipe(syncJSON('file0.json', { report: true }))
-				.on('error', function(err) {
-					var a = new should.Assertion(chalk.stripColor(err.message));
-					a.params.operator = 'not to be emitted';
-					a.fail();
-				})
 				.pipe(assert.end(done));
 		});
 
