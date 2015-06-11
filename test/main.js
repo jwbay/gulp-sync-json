@@ -323,4 +323,62 @@ describe('gulp-sync-json', function () {
 		        });
 		});
 	});
+
+	describe('report mode', function () {		
+		it('should do nothing if targets are synced', function(done) {
+			var primary = { one: 1 };
+			var target = { one: 2 };
+			test(primary, target)
+				.pipe(syncJSON('file0.json', { report: true }))
+				.on('error', function(err) {
+					var a = new should.Assertion(chalk.stripColor(err.message));
+					a.params.operator = 'not to be emitted';
+					a.fail();
+				})
+				.pipe(assert.end(done));
+		});
+
+		it('should supress multiple errors and emit once', function(done) {
+			var primary = { one: 1 };
+			var targetOne = "not json";
+			var targetTwo = { bad: "key" };
+			var targetThree = [];
+
+			var originalLog = gutil.log;
+			gutil.log = function() { };
+
+			test(primary, targetOne, targetTwo, targetThree)
+				.pipe(syncJSON('file0.json', { report: true }))
+				.on('error', function (err) {
+					chalk.stripColor(err.message).should.eql('Report failed with 3 items');
+					gutil.log = originalLog;
+					done();
+				});
+		});
+
+		it('should capture multiple errors and log them before emitting the report error', function(done) {
+			var primary = { one: 1 };
+			var targetOne = "not json";
+			var targetTwo = { bad: "key" };
+			var targetThree = [];
+
+			var originalLog = gutil.log;
+			var capturedOutput = [];
+			gutil.log = function() {
+				capturedOutput = [].slice.call(arguments);
+			};
+
+			test(primary, targetOne, targetTwo, targetThree)
+				.pipe(syncJSON('file0.json', { report: true }))
+				.on('error', function (err) {
+					var errorMessages = capturedOutput[1].split(gutil.linefeed).slice(1);
+					errorMessages.length.should.eql(3);
+					chalk.stripColor(errorMessages[0]).should.endWith('contains invalid JSON');
+					chalk.stripColor(errorMessages[1]).should.endWith('contains unaligned key structure');
+					chalk.stripColor(errorMessages[2]).should.endWith('is a JSON type that cannot be synced: Array. Only Objects are supported');
+					gutil.log = originalLog;
+					done();
+				});
+		});
+	});
 });

@@ -6,7 +6,6 @@ var through = require('through2');
 var merge = require('merge');
 var os = require('os');
 var PluginError = gutil.PluginError;
-var log = gutil.log;
 var colors = gutil.colors;
 
 var pluginName = 'gulp-sync-json';
@@ -67,8 +66,13 @@ module.exports = function(primaryFile, options) {
 			var allMessages = reportErrors.map(function(e) {
 				return e.message;
 			}).join(os.EOL);
-			log(colors.cyan(pluginName), " report found the following:" + os.EOL + allMessages);
-			stream.emit('error', new PluginError(pluginName, colors.red('Report failed')));
+			gutil.log(colors.cyan(pluginName), " report found the following:" + os.EOL + allMessages);
+			var errorMessage = [
+				colors.red('Report failed with'),
+				colors.magenta(reportErrors.length),
+				colors.red('items')
+			].join(' ');
+			stream.emit('error', new PluginError(pluginName, errorMessage));
 		}
 		done();
 	}
@@ -218,11 +222,11 @@ function logSyncResult(syncResult, fileName, mode) {
 	var prefix;
 	if (syncResult.pushed.length) {
 		prefix = mode === modes.write ? 'Pushed to' : 'Missing keys in';
-		log(prefix, colors.cyan(fileName) + ':', getResultString(syncResult.pushed));
+		gutil.log(prefix, colors.cyan(fileName) + ':', getResultString(syncResult.pushed));
 	}
 	if (syncResult.removed.length) {
 		prefix = mode === modes.write ? 'Removed from' : 'Orphaned keys found in';
-		log(prefix, colors.cyan(fileName) + ':', getResultString(syncResult.removed));
+		gutil.log(prefix, colors.cyan(fileName) + ':', getResultString(syncResult.removed));
 	}
 }
 
