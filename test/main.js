@@ -366,7 +366,12 @@ describe('gulp-sync-json', function () {
 			test(primary, targetOne, targetTwo, targetThree)
 				.pipe(syncJSON('file0.json', { report: true }))
 				.on('error', function (err) {
-					var errorMessages = capturedOutput[1].split(gutil.linefeed).slice(1);
+					var errorMessages = capturedOutput[1]
+						.split(gutil.linefeed)
+						.slice(1)
+						.map(function(m) {
+							return m.trim();
+						});
 					errorMessages.length.should.eql(3);
 					chalk.stripColor(errorMessages[0]).should.endWith('contains invalid JSON');
 					chalk.stripColor(errorMessages[1]).should.endWith('contains unaligned key structure');
