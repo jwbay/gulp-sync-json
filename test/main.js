@@ -48,4 +48,53 @@ describe('gulp-sync-json', function () {
 			.pipe(assert.nth(2, contentsAre(c)))
 			.pipe(assert.end(done));
 	});
+	
+	it('should add missing keys', function (done) {
+		var primary = {
+			one: 1,
+			two: 2
+		};
+		var target = {
+			one: 1
+		};
+		test(primary, target)
+			.pipe(syncJSON('file0.json'))
+			.pipe(assert.second(contentsAre({
+				one: 1,
+				two: 2
+			})))
+			.pipe(assert.end(done));
+	});
+	
+	it('should remove non-primary keys', function (done) {
+		var primary = {
+			one: 1
+		};
+		var target = {
+			should: 'delete me'
+		};
+		test(primary, target)
+			.pipe(syncJSON('file0.json'))
+			.pipe(assert.second(contentsAre({
+				one: 1
+			})))
+			.pipe(assert.end(done));
+	});
+	
+	it('should not change existing values', function (done) {
+		var primary = {
+			one: 1,
+			two: 2
+		};
+		var target = {
+			one: 3
+		};
+		test(primary, target)
+			.pipe(syncJSON('file0.json'))
+			.pipe(assert.second(contentsAre({
+				one: 3,
+				two: 2
+			})))
+			.pipe(assert.end(done));
+	});
 });
