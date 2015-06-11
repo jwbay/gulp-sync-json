@@ -97,4 +97,80 @@ describe('gulp-sync-json', function () {
 			})))
 			.pipe(assert.end(done));
 	});
+	
+	it('should sync nested keys', function (done) {
+		var primary = {
+			one: 1,
+			deep: {
+				two: 2,
+				nested: {
+					value: 3
+				}
+			}
+		};
+		var target = {
+			gone: 0,
+			deep: {
+				gone: 0,
+				nested: {
+					gone: 0
+				}
+			}
+		};
+		test(primary, target)
+			.pipe(syncJSON('file0.json'))
+			.pipe(assert.second(contentsAre(primary)))
+			.pipe(assert.end(done));
+	});
+	
+	it('should scaffold new structures from primary', function (done) {
+		var primary = {
+			deep: {
+				nested: {
+					value: 3
+				}
+			}
+		};
+		var target = {};
+		test(primary, target)
+			.pipe(syncJSON('file0.json'))
+			.pipe(assert.second(contentsAre(primary)))
+			.pipe(assert.end(done));
+	});
+	
+	it('should clear out structures from target', function (done) {
+		var primary = {};
+		var target = {
+			deep: {
+				nested: {
+					value: 3
+				}
+			}
+		};
+		test(primary, target)
+			.pipe(syncJSON('file0.json'))
+			.pipe(assert.second(contentsAre(primary)))
+			.pipe(assert.end(done));
+	});
+	
+	it('should not inspect or sync array contents', function (done) {
+		var primary = {
+			arr: [{
+				one: 1
+			}, {
+				two: 2
+			}]
+		};
+		var target = {
+			arr: [{
+				three: 3
+			}, {
+				four: 4
+			}]
+		};
+		test(primary, target)
+			.pipe(syncJSON('file0.json'))
+			.pipe(assert.second(contentsAre(target)))
+			.pipe(assert.end(done));
+	});
 });
