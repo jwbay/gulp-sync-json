@@ -24,13 +24,13 @@ describe('gulp-sync-json', function () {
 	});
 	
 	it('should emit error on streamed file', function (done) {
-      gulp.src(path.join(__dirname, 'test-stream.js'), { buffer: false })
-        .pipe(syncJSON('fake.json'))
-        .on('error', function (err) {
-          err.message.should.eql('Streams not supported');
-          done();
-        });
-    });
+		gulp.src(path.join(__dirname, 'test-stream.js'), { buffer: false })
+			.pipe(syncJSON('fake.json'))
+			.on('error', function (err) {
+			err.message.should.eql('Streams not supported');
+			done();
+		});
+	});
 	
 	it('should ignore single files', function (done) {
 		var a = { a: 1 };
@@ -78,9 +78,7 @@ describe('gulp-sync-json', function () {
 		};
 		test(primary, target)
 			.pipe(syncJSON('file0.json'))
-			.pipe(assert.second(contentsAre({
-				one: 1
-			})))
+			.pipe(assert.second(contentsAre({ one: 1 })))
 			.pipe(assert.end(done));
 	});
 	
@@ -194,12 +192,8 @@ describe('gulp-sync-json', function () {
 		test(primary, targetOne, targetTwo, targetThree)
 			.pipe(syncJSON('file0.json'))
 			.pipe(assert.second(contentsAre(primary)))
-			.pipe(assert.nth(2, contentsAre({
-				one: 2
-			})))
-			.pipe(assert.nth(3, contentsAre({
-				one: 3
-			})))
+			.pipe(assert.nth(2, contentsAre({ one: 2 })))
+			.pipe(assert.nth(3, contentsAre({ one: 3 })))
 			.pipe(assert.end(done));
 	});
 	
@@ -227,7 +221,7 @@ describe('gulp-sync-json', function () {
 			.pipe(assert.end(done));
 	});
 	
-	it('should error when trying to sync against an array', function(done) {
+	it('should emit error when trying to sync against an array', function(done) {
 		var primary = { one: 1 };
 		test(primary, [0, 1])
 			.pipe(syncJSON('file0.json'))
@@ -237,7 +231,7 @@ describe('gulp-sync-json', function () {
 	        });
 	});
 	
-	it('should error when trying to sync against a number', function(done) {
+	it('should emit error when trying to sync against a number', function(done) {
 		var primary = { one: 1 };
 		test(primary, 42)
 			.pipe(syncJSON('file0.json'))
@@ -247,7 +241,7 @@ describe('gulp-sync-json', function () {
 	        });
 	});
 	
-	it('should error when trying to sync against a string', function(done) {
+	it('should emit error when trying to sync against a string', function(done) {
 		var primary = { one: 1 };
 		test(primary, "\"hello world\"")
 			.pipe(syncJSON('file0.json'))
@@ -257,7 +251,7 @@ describe('gulp-sync-json', function () {
 	        });
 	});
 	
-	it('should error when trying to sync against a boolean', function(done) {
+	it('should emit error when trying to sync against a boolean', function(done) {
 		var primary = { one: 1 };
 		test(primary, true)
 			.pipe(syncJSON('file0.json'))
@@ -267,7 +261,7 @@ describe('gulp-sync-json', function () {
 	        });
 	});
 		
-	it('should error when trying to sync against null', function(done) {
+	it('should emit error when trying to sync against null', function(done) {
 		var primary = { one: 1 };
 		test(primary, null)
 			.pipe(syncJSON('file0.json'))
@@ -276,8 +270,38 @@ describe('gulp-sync-json', function () {
 				done();
 	        });
 	});
+	
+	it('should emit error for invalid JSON in primary', function(done) {
+		var primary = "not json";
+		var target = { one: 1 };
+		test(primary, target)
+			.pipe(syncJSON('file0.json'))
+			.on('error', function (err) {
+				chalk.stripColor(err.message).should.endWith('contains invalid JSON');
+				done();
+	        });
+	});
+	
+	it('should emit error for invalid JSON in target', function(done) {
+		var primary = { one: 1 };
+		var target = "not json";
+		test(primary, target)
+			.pipe(syncJSON('file0.json'))
+			.on('error', function (err) {
+				chalk.stripColor(err.message).should.endWith('contains invalid JSON');
+				done();
+	        });
+	});
+		
+	it('should not try to parse ignored files', function (done) {
+		var primary = "not json";
+		test(primary)
+			.pipe(syncJSON('file0.json'))
+			.pipe(assert.length(1))
+			.pipe(assert.end(done));
+	})
 
-	it('should error when types are mismatched on matching keys', function(done) {
+	it('should emit error when types are mismatched on matching keys', function(done) {
 		var primary = { badKey: 1 };
 		var target = { badKey: "two" }
 		test(primary, target)
