@@ -19,13 +19,12 @@
   "author": "justin.bay@outlook.com",
   "license": "MIT",
   "dependencies": {
-    "gulp-util": "^3.0.4",
+    "gulp-util": "^3.0.5",
     "merge": "^1.2.0",
     "through2": "^0.6.5"
   },
   "devDependencies": {
     "gulp": "^3.9.0",
-    "gulp-util": "^3.0.5",
     "mocha": "^2.2.5",
     "should": "^6.0.3",
     "stream-array": "^1.1.0",
