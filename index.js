@@ -26,7 +26,7 @@ module.exports = function(primaryFile, options) {
 		verbose: false
 	}, options);
 	var mode = options.report ? modes.report : modes.write;
-	var reportErrors = [];
+	var reportErrors = []; //TODO these are never emitted, can just be string[]
 
 	function intakeFile(file, enc, done) {
 		if (file.isStream()) {
@@ -72,18 +72,16 @@ module.exports = function(primaryFile, options) {
 		if (dir.source && dir.targets && dir.targets.length > 0) {
 			syncFiles.call(this, dir.source, dir.targets);
 		} else {
-			passFiles.call(this, dir.source, dir.targets);
+			ignoreFiles.call(this, dir.source, dir.targets);
 		}
 	}
 
-	function passFiles(source, targets) {
+	function ignoreFiles(source, targets) {
 		if (source) {
 			this.push(source);
 		}
 		if (targets) {
-			for (var i = 0; i < targets.length; i++) {
-				this.push(targets[i]);
-			}
+			targets.forEach(this.push.bind(this));
 		}
 	}
 
@@ -92,67 +90,33 @@ module.exports = function(primaryFile, options) {
 		this.push(sourceFile);
 		var sourceObject = fileToObject.call(this, sourceFile);
 		if (sourceObject === null) { return; }
-		var stream = this;
 
-		targetFiles.forEach(function (target) {
-			var name = getName(target);
-			var targetKeys = fileToObject.call(stream, target);
-			if (targetKeys === null) { return; }
-			var syncResult = sync(sourceObject, targetKeys, stream, name);
-			if (options.verbose) {
-				logSyncResult(syncResult, name, mode);
-			}
-			if (mode === modes.write) {
-				target.contents = objectToBuffer(targetKeys, options.spaces);
-			} else if (syncResult.pushed.length || syncResult.removed.length) {
-				reportErrors.push(new PluginError(pluginName, colors.cyan(name) + ' contains unaligned key structure'));
-			}
-			stream.push(target);
-		});
+		targetFiles.forEach(syncSingleFile.bind(this, sourceObject));
 	}
 
-	function sync(source, target, stream, name) {
+	//TODO early return causes files to get dropped from stream in report mode
+	function syncSingleFile(sourceObject, targetFile) {
+		var fileName = getName(targetFile);
+		var targetObject = fileToObject.call(this, targetFile);
+		if (targetObject === null) { return; }
+		var syncResult = syncObjects.call(this, sourceObject, targetObject, fileName);
+		if (options.verbose) {
+			logSyncResult(syncResult, fileName, mode);
+		}
+		if (mode === modes.write) {
+			targetFile.contents = objectToBuffer(targetObject, options.spaces);
+		} else if (syncResult.pushed.length || syncResult.removed.length) {
+			reportErrors.push(new PluginError(pluginName, colors.cyan(fileName) + ' contains unaligned key structure'));
+		}
+		this.push(targetFile);
+	}
+
+	function syncObjects(source, target, fileName) {
 		var pushedKeys = [];
 		var removedKeys = [];
 
-		Object.keys(source).forEach(function (key) {
-			function recurse(key) {
-				var result = sync(source[key], target[key], stream, name);
-				pushedKeys.push.apply(pushedKeys, result.pushed);
-				removedKeys.push.apply(removedKeys, result.removed);
-			}
-
-			if (!target.hasOwnProperty(key)) {
-				switch (typeof source[key]) {
-					case 'string':
-					case 'boolean':
-					case 'number':
-						pushedKeys.push(key);
-						target[key] = source[key];
-						break;
-					case 'object':
-						if (source[key] === null || Array.isArray(source[key])) {
-							pushedKeys.push(key);
-							target[key] = source[key];
-							break;
-						}
-						target[key] = {};
-						recurse(key);
-						break;
-					default:
-						break;
-				}
-			} else {
-				if (typeof source[key] !== typeof target[key]) {
-					var typeMismatchError = makeTypeMismatchError(name, key, source[key], target[key]);
-					handleError(typeMismatchError, stream);
-				} else {
-					if (getTypeName(source[key]) === 'Object') {
-						recurse(key);
-					}
-				}
-			}
-		});
+		var merge = mergeKey.bind(this, source, target, pushedKeys, removedKeys, fileName);
+		Object.keys(source).map(merge);
 
 		Object.keys(target).forEach(function (key) {
 			if (!source.hasOwnProperty(key)) {
@@ -166,6 +130,50 @@ module.exports = function(primaryFile, options) {
 			removed: removedKeys
 		};
 	}
+
+	function mergeKey(source, target, pushedKeys, removedKeys, fileName, key) {
+		var stream = this;
+		function recurse(key) {
+			var result = syncObjects.call(stream, source[key], target[key], fileName);
+			pushedKeys.push.apply(pushedKeys, result.pushed);
+			removedKeys.push.apply(removedKeys, result.removed);
+		}
+
+		if (!target.hasOwnProperty(key)) {
+			switch (typeof source[key]) {
+				case 'string':
+				case 'boolean':
+				case 'number':
+					pushedKeys.push(key);
+					target[key] = source[key];
+					break;
+				case 'object':
+					if (source[key] === null || Array.isArray(source[key])) {
+						pushedKeys.push(key);
+						target[key] = source[key];
+						break;
+					}
+					target[key] = {};
+					recurse(key);
+					break;
+				default:
+					break;
+			}
+		} else {
+			if (typeof source[key] !== typeof target[key]) {
+				var typeMismatchError = makeTypeMismatchError(fileName, key, source[key], target[key]);
+				handleError(typeMismatchError, stream);
+			} else {
+				if (getTypeName(source[key]) === 'Object') {
+					recurse(key);
+				}
+			}
+		}
+
+	}
+
+
+
 
 	function fileToObject(file) {
 		var name = getName(file);
