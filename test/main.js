@@ -16,6 +16,19 @@ function contentsAre(obj) {
 	};
 }
 
+function getGulpLog() {
+	var capturedOutput = [];
+	var originalLog = gutil.log;
+	capturedOutput.restore = function () {
+		gutil.log = originalLog;
+	}
+	gutil.log = function () {
+		var line = Array.prototype.join.call(arguments, ' ');
+		capturedOutput.push(chalk.stripColor(line));
+	}
+	return capturedOutput;
+}
+
 describe('gulp-sync-json', function () {
 	describe('api', function () {
 		it('should throw when primary file isn\'t provided', function () {
@@ -213,6 +226,27 @@ describe('gulp-sync-json', function () {
 		});
 	});
 
+	describe('verbose logging', function () {
+
+
+		it('should log key additions', function (done) {
+			var primary = {
+				one: 1,
+				two: 2
+			};
+			var target = {
+				one: 1
+			};
+			test(primary, target)
+				.pipe(syncJSON('file0.json'))
+				.pipe(assert.second(contentsAre({
+					one: 1,
+					two: 2
+				})))
+				.pipe(assert.end(done));
+		});
+	});
+
 	describe('empty targets', function() {
 		it('should push to empty objects', function (done) {
 			var primary = { one: 1 };
@@ -340,15 +374,13 @@ describe('gulp-sync-json', function () {
 			var targetOne = "not json";
 			var targetTwo = { bad: "key" };
 			var targetThree = [];
-
-			var originalLog = gutil.log;
-			gutil.log = function() { };
+			var logged = getGulpLog();
 
 			test(primary, targetOne, targetTwo, targetThree)
 				.pipe(syncJSON('file0.json', { report: true }))
 				.on('error', function (err) {
-					chalk.stripColor(err.message).should.eql('Report failed with 3 items');
-					gutil.log = originalLog;
+					err.message.should.eql('Report failed with 3 items');
+					logged.restore();
 					done();
 				});
 		});
@@ -358,27 +390,22 @@ describe('gulp-sync-json', function () {
 			var targetOne = "not json";
 			var targetTwo = { bad: "key" };
 			var targetThree = [];
-
-			var originalLog = gutil.log;
-			var capturedOutput = [];
-			gutil.log = function() {
-				capturedOutput = [].slice.call(arguments);
-			};
+			var logged = getGulpLog();
 
 			test(primary, targetOne, targetTwo, targetThree)
 				.pipe(syncJSON('file0.json', { report: true }))
 				.on('error', function (err) {
-					var errorMessages = capturedOutput[1]
+					var errorMessages = logged[0]
 						.split(gutil.linefeed)
 						.slice(1)
 						.map(function(m) {
 							return m.trim();
 						});
 					errorMessages.length.should.eql(3);
-					chalk.stripColor(errorMessages[0]).should.endWith('contains invalid JSON');
-					chalk.stripColor(errorMessages[1]).should.endWith('contains unaligned key structure');
-					chalk.stripColor(errorMessages[2]).should.endWith('is a JSON type that cannot be synced: Array. Only Objects are supported');
-					gutil.log = originalLog;
+					errorMessages[0].should.endWith('contains invalid JSON');
+					errorMessages[1].should.endWith('contains unaligned key structure');
+					errorMessages[2].should.endWith('is a JSON type that cannot be synced: Array. Only Objects are supported');
+					logged.restore();
 					done();
 				});
 		});
