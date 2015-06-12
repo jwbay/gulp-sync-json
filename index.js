@@ -114,15 +114,16 @@ module.exports = function(primaryFile, options) {
 	function syncObjects(source, target, fileName) {
 		var pushedKeys = [];
 		var removedKeys = [];
+		var mergeKeys = mergeKey.bind(this, source, target, fileName);
+		var clearKeys = clearKey.bind(this, source, target);
 
-		var merge = mergeKey.bind(this, source, target, pushedKeys, removedKeys, fileName);
-		Object.keys(source).map(merge);
+		Object.keys(source).map(mergeKeys).forEach(function (result) {
+			pushedKeys = pushedKeys.concat(result.pushed);
+			removedKeys = removedKeys.concat(result.removed);
+		});
 
-		Object.keys(target).forEach(function (key) {
-			if (!source.hasOwnProperty(key)) {
-				delete target[key];
-				removedKeys.push(key);
-			}
+		Object.keys(target).map(clearKeys).forEach(function (removed) {
+			removedKeys = removedKeys.concat(removed);
 		});
 
 		return {
@@ -131,12 +132,24 @@ module.exports = function(primaryFile, options) {
 		};
 	}
 
-	function mergeKey(source, target, pushedKeys, removedKeys, fileName, key) {
+	//TODO does not log deeply removed keys
+	function clearKey(source, target, key) {
+		if (!source.hasOwnProperty(key)) {
+			delete target[key];
+			return [key];
+		}
+		return [];
+	}
+
+	function mergeKey(source, target, fileName, key) {
+		var pushedKeys = [];
+		var removedKeys = [];
 		var stream = this;
+
 		function recurse(key) {
 			var result = syncObjects.call(stream, source[key], target[key], fileName);
-			pushedKeys.push.apply(pushedKeys, result.pushed);
-			removedKeys.push.apply(removedKeys, result.removed);
+			pushedKeys = pushedKeys.concat(result.pushed);
+			removedKeys = removedKeys.concat(result.removed);
 		}
 
 		if (!target.hasOwnProperty(key)) {
@@ -170,10 +183,11 @@ module.exports = function(primaryFile, options) {
 			}
 		}
 
+		return {
+			pushed: pushedKeys,
+			removed: removedKeys
+		};
 	}
-
-
-
 
 	function fileToObject(file) {
 		var name = getName(file);

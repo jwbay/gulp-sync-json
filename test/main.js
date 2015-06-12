@@ -21,11 +21,11 @@ function getGulpLog() {
 	var originalLog = gutil.log;
 	capturedOutput.restore = function () {
 		gutil.log = originalLog;
-	}
+	};
 	gutil.log = function () {
 		var line = Array.prototype.join.call(arguments, ' ');
 		capturedOutput.push(chalk.stripColor(line));
-	}
+	};
 	return capturedOutput;
 }
 
@@ -227,23 +227,92 @@ describe('gulp-sync-json', function () {
 	});
 
 	describe('verbose logging', function () {
-
-
 		it('should log key additions', function (done) {
 			var primary = {
 				one: 1,
-				two: 2
+				two: 2,
+				three: 3
 			};
-			var target = {
-				one: 1
-			};
+			var target = {};
+			var log = getGulpLog();
+
 			test(primary, target)
-				.pipe(syncJSON('file0.json'))
-				.pipe(assert.second(contentsAre({
-					one: 1,
-					two: 2
-				})))
-				.pipe(assert.end(done));
+				.pipe(syncJSON('file0.json', { verbose: true }))
+				.pipe(assert.end(function () {
+					log[0].should.containEql('one');
+					log[0].should.containEql('two');
+					log[0].should.containEql('three');
+					log.restore();
+					done();
+				}))
+		});
+
+		it('should log nested key additions', function (done) {
+			var primary = {
+				one: 1,
+				nested: {
+					two: 2,
+					deeply: {
+						three: 3
+					}
+				}
+			};
+			var target = {};
+			var log = getGulpLog();
+
+			test(primary, target)
+				.pipe(syncJSON('file0.json', { verbose: true }))
+				.pipe(assert.end(function () {
+					log[0].should.containEql('one');
+					log[0].should.containEql('two');
+					log[0].should.containEql('three');
+					log.restore();
+					done();
+				}))
+		});
+
+		it('should log key removals', function (done) {
+			var primary = {};
+			var target = {
+				one: 1,
+				two: 2,
+				three: 3
+			};
+			var log = getGulpLog();
+
+			test(primary, target)
+				.pipe(syncJSON('file0.json', { verbose: true }))
+				.pipe(assert.end(function () {
+					log[0].should.containEql('one');
+					log[0].should.containEql('two');
+					log[0].should.containEql('three');
+					log.restore();
+					done();
+				}))
+		});
+
+		it.skip('should log nested key removals', function (done) {
+			var primary = {};
+			var target = {
+				one: 1,
+				nested: {
+					two: 2,
+					deeply: {
+						three: 3
+					}
+				}
+			};
+			var log = getGulpLog();
+
+			test(primary, target)
+				.pipe(syncJSON('file0.json', { verbose: true }))
+				.pipe(assert.end(function () {
+					log[0].should.containEql('one');
+					log[0].should.containEql('two');
+					log[0].should.containEql('three');
+					log.restore();
+					done();
+				}))
 		});
 	});
 
