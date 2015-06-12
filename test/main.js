@@ -80,7 +80,7 @@ describe('gulp-sync-json', function () {
 	});
 
 	describe('sync behavior', function() {
-		it('should add missing keys', function (done) {
+		it('should copy missing keys', function (done) {
 			var primary = {
 				one: 1,
 				two: 2
@@ -90,10 +90,23 @@ describe('gulp-sync-json', function () {
 			};
 			test(primary, target)
 				.pipe(syncJSON('file0.json'))
-				.pipe(assert.second(contentsAre({
-					one: 1,
-					two: 2
-				})))
+				.pipe(assert.second(contentsAre(primary)))
+				.pipe(assert.end(done));
+		});
+
+		it('should copy primitives and arrays', function (done) {
+			var primary = {
+				"array": ["value", "other"],
+				"string": "string",
+				"true": true,
+				"false": false,
+				"null": null,
+				"number": -45.5e-2
+			};
+			var target = {};
+			test(primary, target)
+				.pipe(syncJSON('file0.json'))
+				.pipe(assert.second(contentsAre(primary)))
 				.pipe(assert.end(done));
 		});
 

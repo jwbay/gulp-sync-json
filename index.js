@@ -132,7 +132,7 @@ module.exports = function(primaryFile, options) {
 		};
 	}
 
-	//TODO does not log deeply removed keys
+	//TODO does not log deeply removed keys, need to walk tree and gather key names that have primitive/array values
 	function clearKey(source, target, key) {
 		if (!source.hasOwnProperty(key)) {
 			delete target[key];
@@ -142,51 +142,34 @@ module.exports = function(primaryFile, options) {
 	}
 
 	function mergeKey(source, target, fileName, key) {
-		var pushedKeys = [];
-		var removedKeys = [];
-		var stream = this;
+		var sourceValue = source[key];
+		var sourceType = getTypeName(sourceValue);
+		var targetValue = target[key];
+		var targetType = getTypeName(targetValue);
 
-		function recurse(key) {
-			var result = syncObjects.call(stream, source[key], target[key], fileName);
-			pushedKeys = pushedKeys.concat(result.pushed);
-			removedKeys = removedKeys.concat(result.removed);
-		}
-
-		if (!target.hasOwnProperty(key)) {
-			switch (typeof source[key]) {
-				case 'string':
-				case 'boolean':
-				case 'number':
-					pushedKeys.push(key);
-					target[key] = source[key];
-					break;
-				case 'object':
-					if (source[key] === null || Array.isArray(source[key])) {
-						pushedKeys.push(key);
-						target[key] = source[key];
-						break;
-					}
-					target[key] = {};
-					recurse(key);
-					break;
-				default:
-					break;
-			}
-		} else {
-			if (typeof source[key] !== typeof target[key]) {
-				var typeMismatchError = makeTypeMismatchError(fileName, key, source[key], target[key]);
-				handleError(typeMismatchError, stream);
-			} else {
-				if (getTypeName(source[key]) === 'Object') {
-					recurse(key);
+		if (target.hasOwnProperty(key)) {
+			if (sourceType === targetType) {
+				if (sourceType === 'Object') {
+					return syncObjects.call(this, sourceValue, targetValue, fileName);
 				}
+				return { pushed: [], removed: [] }; //objects agree on keys and types: nothing to do
 			}
+			var typeMismatchError = makeTypeMismatchError(fileName, key, sourceValue, targetValue);
+			handleError(typeMismatchError, this);
+			return { pushed: [], removed: [] };
+		}
+		return copyValue(sourceValue, target, fileName, key);
+	}
+
+	function copyValue(sourceValue, target, fileName, key) {
+		if (getTypeName(sourceValue) === 'Object') {
+			target[key] = {};
+			return syncObjects.call(this, sourceValue, target[key], fileName);
 		}
 
-		return {
-			pushed: pushedKeys,
-			removed: removedKeys
-		};
+		target[key] = sourceValue;
+
+		return { pushed: [key], removed: [] };
 	}
 
 	function fileToObject(file) {
