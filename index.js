@@ -28,7 +28,7 @@ module.exports = function(primaryFile, options) {
 	var mode = options.report ? modes.report : modes.write;
 	var reportErrors = [];
 
-	function addFiles(file, enc, done) {
+	function intakeFile(file, enc, done) {
 		if (file.isStream()) {
 			this.emit('error', new PluginError(pluginName, 'Streams not supported'));
 			return done();
@@ -42,50 +42,63 @@ module.exports = function(primaryFile, options) {
 			dir.targets = dir.targets || [];
 			dir.targets.push(file);
 		}
+
 		done();
 	}
 
 	function processFiles(done) {
-		var stream = this;
-		Object.keys(directories).forEach(function(directory) {
-			var dir = directories[directory];
-			if (dir.source && dir.targets && dir.targets.length > 0) {
-				processDirectory(dir.source, dir.targets, stream);	
-			} else {
-				if (dir.source) {
-					stream.push(dir.source);
-				}
-				if (dir.targets) {
-					dir.targets.forEach(function(file) {
-						stream.push(file);
-					});
-				}
-			}
-		});
+		Object.keys(directories).forEach(processDirectory.bind(this));
+
 		if (mode === modes.report && reportErrors.length > 0) {
-			var allMessages = reportErrors.map(function(e) {
-				return e.message;
-			}).join(os.EOL);
-			gutil.log(colors.cyan(pluginName), " report found the following:" + os.EOL + allMessages);
-			var errorMessage = [
-				colors.red('Report failed with'),
-				colors.magenta(reportErrors.length),
-				colors.red('items')
-			].join(' ');
-			stream.emit('error', new PluginError(pluginName, errorMessage));
+			emitReport.call(this);
 		}
+
 		done();
 	}
 
-	function processDirectory(source, targets, stream) {
-		var sourceKeys = fileToObject(source, stream);
-		if (sourceKeys === null) { return; }
-		stream.push(source);
-		targets.forEach(function (target) {
+	function emitReport() {
+		var allMessages = reportErrors.map(function (e) {
+			return e.message;
+		}).join(os.EOL);
+
+		gutil.log(colors.cyan(pluginName), " report found the following:" + os.EOL + allMessages);
+
+		var errorMessage = 'Report failed with ' + reportErrors.length + ' items';
+		this.emit('error', new PluginError(pluginName, errorMessage));
+	}
+
+	function processDirectory(directory) {
+		var dir = directories[directory];
+		if (dir.source && dir.targets && dir.targets.length > 0) {
+			syncFiles.call(this, dir.source, dir.targets);
+		} else {
+			passFiles.call(this, dir.source, dir.targets);
+		}
+	}
+
+	function passFiles(source, targets) {
+		if (source) {
+			this.push(source);
+		}
+		if (targets) {
+			for (var i = 0; i < targets.length; i++) {
+				this.push(targets[i]);
+			}
+		}
+	}
+
+	//TODO early return causes files to get dropped from stream in report mode
+	function syncFiles(sourceFile, targetFiles) {
+		this.push(sourceFile);
+		var sourceObject = fileToObject.call(this, sourceFile);
+		if (sourceObject === null) { return; }
+		var stream = this;
+
+		targetFiles.forEach(function (target) {
 			var name = getName(target);
-			var targetKeys = fileToObject(target, stream);
+			var targetKeys = fileToObject.call(stream, target);
 			if (targetKeys === null) { return; }
-			var syncResult = sync(sourceKeys, targetKeys, stream, name);
+			var syncResult = sync(sourceObject, targetKeys, stream, name);
 			if (options.verbose) {
 				logSyncResult(syncResult, name, mode);
 			}
@@ -154,7 +167,7 @@ module.exports = function(primaryFile, options) {
 		};
 	}
 
-	function fileToObject(file, stream) {
+	function fileToObject(file) {
 		var name = getName(file);
 		var parsedContents;
 
@@ -167,14 +180,14 @@ module.exports = function(primaryFile, options) {
 			}
 		} catch (error) {
 			var jsonError = new PluginError(pluginName, colors.cyan(name) + ' contains invalid JSON');
-			handleError(jsonError, stream);
+			handleError(jsonError, this);
 			return null;
 		}
 
 		var typeName = getTypeName(parsedContents);
 		if (typeName !== 'Object') {
 			var notObjectError = new PluginError(pluginName, colors.cyan(name) + ' is a JSON type that cannot be synced: ' + colors.cyan(typeName) + '. Only Objects are supported');
-			handleError(notObjectError, stream);
+			handleError(notObjectError, this);
 			return null;
 		}
 
@@ -189,7 +202,7 @@ module.exports = function(primaryFile, options) {
 		}
 	}
 
-	return through.obj(addFiles, processFiles);
+	return through.obj(intakeFile, processFiles);
 };
 
 function getTypeName(o) {

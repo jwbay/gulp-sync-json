@@ -39,6 +39,7 @@ describe('gulp-sync-json', function () {
 			var a = { a: 1 };
 			test(a)
 				.pipe(syncJSON('file0.json'))
+				.pipe(assert.length(1))
 				.pipe(assert.first(contentsAre(a)))
 				.pipe(assert.end(done));
 		});
@@ -49,6 +50,7 @@ describe('gulp-sync-json', function () {
 			var c = { c: 3 };
 			test(a, b, c)
 				.pipe(syncJSON('notfound.json'))
+				.pipe(assert.length(3))
 				.pipe(assert.first(contentsAre(a)))
 				.pipe(assert.second(contentsAre(b)))
 				.pipe(assert.nth(2, contentsAre(c)))
