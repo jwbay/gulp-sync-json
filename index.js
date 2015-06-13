@@ -5,14 +5,10 @@ var gutil = require('gulp-util');
 var through = require('through2');
 var merge = require('merge');
 var os = require('os');
+
 var PluginError = gutil.PluginError;
 var colors = gutil.colors;
-
 var pluginName = 'gulp-sync-json';
-var modes = {
-	write: 'write',
-	report: 'report'
-};
 
 module.exports = function(primaryFile, options) {
 	if (!primaryFile) {
@@ -24,9 +20,7 @@ module.exports = function(primaryFile, options) {
 		spaces: 4,
 		verbose: false
 	}, options);
-
 	var directories = {}; // { [path: string]: { source: Vinyl, targets: Vinyl[] }
-	var mode = options.report ? modes.report : modes.write;
 	var reportErrors = [];
 	var onReportError = Array.prototype.push.bind(reportErrors);
 
@@ -37,24 +31,6 @@ module.exports = function(primaryFile, options) {
 		}
 
 		assignFileToDirectory(file);
-		done();
-	}
-
-	function processFiles(done) {
-		var handleSyncError = onSyncError.bind(this, mode);
-
-		this.on('syncError', handleSyncError)
-			.on('reportError', onReportError);
-
-		Object.keys(directories).forEach(processDirectory.bind(this));
-
-		this.removeListener('syncError', onSyncError)
-			.removeListener('reportError', onReportError);
-
-		if (mode === modes.report && reportErrors.length > 0) {
-			emitReport.call(this, reportErrors);
-		}
-
 		done();
 	}
 
@@ -69,79 +45,97 @@ module.exports = function(primaryFile, options) {
 		}
 	}
 
+	function processFiles(done) {
+		var handleSyncError = onSyncError.bind(this, options.report);
+
+		this.on('syncError', handleSyncError)
+			.on('reportError', onReportError);
+
+		Object.keys(directories).forEach(processDirectory.bind(this));
+
+		this.removeListener('syncError', handleSyncError)
+			.removeListener('reportError', onReportError);
+
+		if (options.report && reportErrors.length > 0) {
+			emitReport.call(this, reportErrors);
+		}
+
+		done();
+	}
+
 	function processDirectory(directory) {
 		var dir = directories[directory];
 		if (dir.source && dir.targets && dir.targets.length > 0) {
-			syncFiles.call(this, dir.source, dir.targets);
+			syncFiles.call(this, dir.source, dir.targets, options);
 		} else {
 			ignoreFiles.call(this, dir.source, dir.targets);
 		}
 	}
 
-	function ignoreFiles(source, targets) {
-		if (source) {
-			this.push(source);
-		}
-		if (targets) {
-			targets.forEach(this.push.bind(this));
-		}
-	}
-
-	//TODO early return causes all target files to get dropped from stream in report mode
-	function syncFiles(sourceFile, targetFiles) {
-		this.push(sourceFile);
-		var sourceObject = fileToObject.call(this, sourceFile);
-		if (!checkTypeCanBeSynced.call(this, sourceObject, getFileName(sourceFile))) { return; }
-
-		targetFiles.forEach(syncSingleFile.bind(this, sourceObject));
-	}
-
-	//TODO early return causes some files to get dropped from stream in report mode
-	function syncSingleFile(sourceObject, targetFile) {
-		var fileName = getFileName(targetFile);
-		var targetObject = fileToObject.call(this, targetFile);
-		if (!checkTypeCanBeSynced.call(this, targetObject, fileName)) { return; }
-
-		var pushedKeys = [];
-		var removedKeys = [];
-		var onKeyPush = Array.prototype.push.bind(pushedKeys);
-		var onKeyRemove = Array.prototype.push.bind(removedKeys);
-		var onKeyTypeMismatch = function (errorMessageSuffix) {
-			this.emit('syncError', colors.cyan(fileName) + errorMessageSuffix);
-		};
-
-		this.on('keyPushed', onKeyPush)
-			.on('keyRemoved', onKeyRemove)
-			.on('keyTypeMismatch', onKeyTypeMismatch);
-
-		syncObjects.call(this, sourceObject, targetObject, fileName);
-
-		this.removeListener('keyPushed', onKeyPush)
-			.removeListener('keyRemoved', onKeyRemove)
-			.removeListener('keyTypeMismatch', onKeyTypeMismatch);
-
-
-		if (options.verbose) {
-			logSyncResult(pushedKeys, removedKeys, fileName, mode);
-		}
-
-		if (mode === modes.write) {
-			targetFile.contents = objectToBuffer(targetObject, options.spaces);
-		} else if (pushedKeys.length || removedKeys.length) {
-			reportErrors.push(colors.cyan(fileName) + ' contains unaligned key structure');
-		}
-
-		this.push(targetFile);
-	}
-
 	return through.obj(intakeFile, processFiles);
 };
 
-function onSyncError(mode, errorMessage) {
-	if (mode === modes.write) {
-		this.emit('error', new PluginError(pluginName, errorMessage));
+//TODO early return causes all target files to get dropped from stream in report mode
+function syncFiles(sourceFile, targetFiles, options) {
+	this.push(sourceFile);
+	var sourceObject = fileToObject.call(this, sourceFile);
+	if (!checkTypeCanBeSynced.call(this, sourceObject, getFileName(sourceFile))) { return; }
+
+	targetFiles.forEach(syncSingleFile.bind(this, options, sourceObject));
+}
+
+//TODO early return causes some files to get dropped from stream in report mode
+function syncSingleFile(options, sourceObject, targetFile) {
+	var fileName = getFileName(targetFile);
+	var targetObject = fileToObject.call(this, targetFile);
+	if (!checkTypeCanBeSynced.call(this, targetObject, fileName)) { return; }
+
+	var pushedKeys = [];
+	var removedKeys = [];
+	var onKeyPush = Array.prototype.push.bind(pushedKeys);
+	var onKeyRemove = Array.prototype.push.bind(removedKeys);
+	var onKeyTypeMismatch = function (errorMessageSuffix) {
+		this.emit('syncError', colors.cyan(fileName) + errorMessageSuffix);
+	};
+
+	this.on('keyPushed', onKeyPush)
+		.on('keyRemoved', onKeyRemove)
+		.on('keyTypeMismatch', onKeyTypeMismatch);
+
+	syncObjects.call(this, sourceObject, targetObject, fileName);
+
+	this.removeListener('keyPushed', onKeyPush)
+		.removeListener('keyRemoved', onKeyRemove)
+		.removeListener('keyTypeMismatch', onKeyTypeMismatch);
+
+
+	if (options.verbose) {
+		logSyncResult(pushedKeys, removedKeys, fileName, options.report);
+	}
+
+	if (options.report && (pushedKeys.length || removedKeys.length)) {
+		this.emit('reportError', colors.cyan(fileName) + ' contains unaligned key structure');
 	} else {
+		targetFile.contents = objectToBuffer(targetObject, options.spaces);
+	}
+
+	this.push(targetFile);
+}
+
+function ignoreFiles(source, targets) {
+	if (source) {
+		this.push(source);
+	}
+	if (targets) {
+		targets.forEach(this.push.bind(this));
+	}
+}
+
+function onSyncError(reportMode, errorMessage) {
+	if (reportMode) {
 		this.emit('reportError', errorMessage);
+	} else {
+		this.emit('error', new PluginError(pluginName, errorMessage));
 	}
 }
 
@@ -249,14 +243,14 @@ function makeTypeMismatchErrorSuffix(keyName, sourceValue, targetValue) {
 	].join('');
 }
 
-function logSyncResult(pushed, removed, fileName, mode) {
+function logSyncResult(pushed, removed, fileName, reportMode) {
 	var prefix;
 	if (pushed.length) {
-		prefix = mode === modes.write ? 'Pushed to' : 'Missing keys in';
+		prefix = reportMode ? 'Missing keys in' : 'Pushed to';
 		gutil.log(prefix, colors.cyan(fileName) + ':', getResultString(pushed));
 	}
 	if (removed.length) {
-		prefix = mode === modes.write ? 'Removed from' : 'Orphaned keys found in';
+		prefix = reportMode ? 'Orphaned keys found in' : 'Removed from';
 		gutil.log(prefix, colors.cyan(fileName) + ':', getResultString(removed));
 	}
 }
