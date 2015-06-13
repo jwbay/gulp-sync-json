@@ -34,15 +34,7 @@ module.exports = function(primaryFile, options) {
 			return done();
 		}
 
-		var directory = path.dirname(file.path);
-		var dir = directories[directory] = directories[directory] || {};
-		if (path.basename(file.path) === primaryFile) {
-			dir.source = file;
-		} else {
-			dir.targets = dir.targets || [];
-			dir.targets.push(file);
-		}
-
+		assignFileToDirectory(file);
 		done();
 	}
 
@@ -54,6 +46,17 @@ module.exports = function(primaryFile, options) {
 		}
 
 		done();
+	}
+
+	function assignFileToDirectory(file) {
+		var directory = path.dirname(file.path);
+		var dir = directories[directory] = directories[directory] || {};
+		if (path.basename(file.path) === primaryFile) {
+			dir.source = file;
+		} else {
+			dir.targets = dir.targets || [];
+			dir.targets.push(file);
+		}
 	}
 
 	function emitReport() {
@@ -85,7 +88,7 @@ module.exports = function(primaryFile, options) {
 		}
 	}
 
-	//TODO early return causes files to get dropped from stream in report mode
+	//TODO early return causes all target files to get dropped from stream in report mode
 	function syncFiles(sourceFile, targetFiles) {
 		this.push(sourceFile);
 		var sourceObject = fileToObject.call(this, sourceFile);
@@ -94,7 +97,8 @@ module.exports = function(primaryFile, options) {
 		targetFiles.forEach(syncSingleFile.bind(this, sourceObject));
 	}
 
-	//TODO early return causes files to get dropped from stream in report mode
+	//TODO early return causes some files to get dropped from stream in report mode
+	//TODO look into emitting key change events, can gather them here
 	function syncSingleFile(sourceObject, targetFile) {
 		var fileName = getName(targetFile);
 		var targetObject = fileToObject.call(this, targetFile);
@@ -146,20 +150,27 @@ module.exports = function(primaryFile, options) {
 		var sourceType = getTypeName(sourceValue);
 		var targetValue = target[key];
 		var targetType = getTypeName(targetValue);
+		var nothing = { pushed: [], removed: [] };
+		var result;
 
 		if (target.hasOwnProperty(key)) {
 			if (sourceType === targetType) {
 				if (sourceType === 'Object') {
-					return syncObjects.call(this, sourceValue, targetValue, fileName);
+					result = syncObjects.call(this, sourceValue, targetValue, fileName);
+				} else {
+					result = nothing;
 				}
-				return { pushed: [], removed: [] }; //objects agree on keys and types: nothing to do
+			} else {
+				var typeMismatchError = makeTypeMismatchError(fileName, key, sourceValue, targetValue);
+				handleError(typeMismatchError, this);
+				result = nothing;
 			}
-			var typeMismatchError = makeTypeMismatchError(fileName, key, sourceValue, targetValue);
-			handleError(typeMismatchError, this);
-			return { pushed: [], removed: [] };
+		} else {
+			result = copyValue(sourceValue, target, fileName, key);
 		}
-		return copyValue(sourceValue, target, fileName, key);
-	}
+
+		return result;
+	};
 
 	function copyValue(sourceValue, target, fileName, key) {
 		if (getTypeName(sourceValue) === 'Object') {
