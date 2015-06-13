@@ -39,13 +39,23 @@ module.exports = function(primaryFile, options) {
 	}
 
 	function processFiles(done) {
+		this.on('syncError', onSyncError);
 		Object.keys(directories).forEach(processDirectory.bind(this));
+		this.removeListener('syncError', onSyncError);
 
 		if (mode === modes.report && reportErrors.length > 0) {
 			emitReport.call(this);
 		}
 
 		done();
+	}
+
+	function onSyncError(errorMessage) {
+		if (mode === modes.write) {
+			this.emit('error', new PluginError(pluginName, errorMessage));
+		} else {
+			reportErrors.push(errorMessage);
+		}
 	}
 
 	function assignFileToDirectory(file) {
@@ -60,13 +70,10 @@ module.exports = function(primaryFile, options) {
 	}
 
 	function emitReport() {
-		var allMessages = reportErrors.map(function (e) {
-			return e.message;
-		}).join(os.EOL);
-
+		var allMessages = reportErrors.join(os.EOL);
 		gutil.log(colors.cyan(pluginName), " report found the following:" + os.EOL + allMessages);
-
 		var errorMessage = 'Report failed with ' + reportErrors.length + ' items';
+		//TODO param for this
 		this.emit('error', new PluginError(pluginName, errorMessage));
 	}
 
@@ -99,17 +106,28 @@ module.exports = function(primaryFile, options) {
 
 	//TODO early return causes some files to get dropped from stream in report mode
 	function syncSingleFile(sourceObject, targetFile) {
-		var fileName = getName(targetFile);
+		var fileName = getFileName(targetFile);
 		var targetObject = fileToObject.call(this, targetFile);
 		if (targetObject === null) { return; }
 
 		var pushedKeys = [];
 		var removedKeys = [];
-		var recordPush = Array.prototype.push.bind(pushedKeys);
-		var recordRemove = Array.prototype.push.bind(removedKeys);
-		this.on('keyPushed', recordPush).on('keyRemoved', recordRemove);
+		var onKeyPush = Array.prototype.push.bind(pushedKeys);
+		var onKeyRemove = Array.prototype.push.bind(removedKeys);
+		var onKeyTypeMismatch = function (errorMessageSuffix) {
+			this.emit('syncError', colors.cyan(fileName) + errorMessageSuffix);
+		};
+
+		this.on('keyPushed', onKeyPush)
+			.on('keyRemoved', onKeyRemove)
+			.on('keyTypeMismatch', onKeyTypeMismatch);
+
 		syncObjects.call(this, sourceObject, targetObject, fileName);
-		this.removeListener('keyPushed', recordPush).removeListener('keyRemoved', recordRemove);
+
+		this.removeListener('keyPushed', onKeyPush)
+			.removeListener('keyRemoved', onKeyRemove)
+			.removeListener('keyTypeMismatch', onKeyTypeMismatch);
+
 
 		if (options.verbose) {
 			logSyncResult(pushedKeys, removedKeys, fileName, mode);
@@ -118,14 +136,14 @@ module.exports = function(primaryFile, options) {
 		if (mode === modes.write) {
 			targetFile.contents = objectToBuffer(targetObject, options.spaces);
 		} else if (pushedKeys.length || removedKeys.length) {
-			reportErrors.push(new PluginError(pluginName, colors.cyan(fileName) + ' contains unaligned key structure'));
+			reportErrors.push(colors.cyan(fileName) + ' contains unaligned key structure');
 		}
 
 		this.push(targetFile);
 	}
 
-	function syncObjects(source, target, fileName) {
-		Object.keys(source).forEach(mergeKey.bind(this, source, target, fileName));
+	function syncObjects(source, target) {
+		Object.keys(source).forEach(mergeKey.bind(this, source, target));
 		Object.keys(target).forEach(clearKey.bind(this, source, target));
 	}
 
@@ -137,7 +155,7 @@ module.exports = function(primaryFile, options) {
 		}
 	}
 
-	function mergeKey(source, target, fileName, key) {
+	function mergeKey(source, target, key) {
 		var sourceValue = source[key];
 		var sourceType = getTypeName(sourceValue);
 		var targetValue = target[key];
@@ -146,21 +164,21 @@ module.exports = function(primaryFile, options) {
 		if (target.hasOwnProperty(key)) {
 			if (sourceType === targetType) {
 				if (sourceType === 'Object') {
-					syncObjects.call(this, sourceValue, targetValue, fileName);
+					syncObjects.call(this, sourceValue, targetValue);
 				}
 			} else {
-				var typeMismatchError = makeTypeMismatchError(fileName, key, sourceValue, targetValue);
-				handleError(typeMismatchError, this);
+				var errorMessage = makeTypeMismatchErrorSuffix(key, sourceValue, targetValue);
+				this.emit('keyTypeMismatch', errorMessage);
 			}
 		} else {
-			copyValue.call(this, sourceValue, target, fileName, key);
+			copyValue.call(this, sourceValue, target, key);
 		}
 	};
 
-	function copyValue(sourceValue, target, fileName, key) {
+	function copyValue(sourceValue, target, key) {
 		if (getTypeName(sourceValue) === 'Object') {
 			target[key] = {};
-			syncObjects.call(this, sourceValue, target[key], fileName);
+			syncObjects.call(this, sourceValue, target[key]);
 		} else {
 			target[key] = sourceValue;
 			this.emit('keyPushed', key);
@@ -168,7 +186,7 @@ module.exports = function(primaryFile, options) {
 	}
 
 	function fileToObject(file) {
-		var name = getName(file);
+		var fileName = getFileName(file);
 		var parsedContents;
 
 		try {
@@ -185,20 +203,12 @@ module.exports = function(primaryFile, options) {
 
 		var typeName = getTypeName(parsedContents);
 		if (typeName !== 'Object') {
-			var notObjectError = new PluginError(pluginName, colors.cyan(name) + ' is a JSON type that cannot be synced: ' + colors.cyan(typeName) + '. Only Objects are supported');
-			handleError(notObjectError, this);
+			var errorMessage = colors.cyan(fileName) + ' is a JSON type that cannot be synced: ' + colors.cyan(typeName) + '. Only Objects are supported';
+			this.emit('syncError' , errorMessage)
 			return null;
 		}
 
 		return parsedContents;
-	}
-
-	function handleError(error, stream) {
-		if (mode === modes.write) {
-			stream.emit('error', error);
-		} else {
-			reportErrors.push(error);
-		}
 	}
 
 	return through.obj(intakeFile, processFiles);
@@ -209,7 +219,7 @@ function getTypeName(o) {
 	return fullName.split(' ')[1].slice(0, -1); //[object Number] -> Number
 }
 
-function getName(file) {
+function getFileName(file) {
 	return file.path.replace(file.cwd, '');
 }
 
@@ -218,16 +228,14 @@ function objectToBuffer(object, spaces) {
 	return new Buffer(contents);
 }
 
-function makeTypeMismatchError(fileName, keyName, sourceValue, targetValue) {
-	return new PluginError(pluginName, [
-		colors.cyan(fileName),
-		' contains type mismatch on key ',
+function makeTypeMismatchErrorSuffix(keyName, sourceValue, targetValue) {
+	return [' contains type mismatch on key ',
 		colors.cyan(keyName),
 		'. Source type ',
 		colors.cyan(typeof sourceValue),
 		', target type ',
 		colors.cyan(typeof targetValue)
-	].join(''));
+	].join('');
 }
 
 function logSyncResult(pushed, removed, fileName, mode) {
