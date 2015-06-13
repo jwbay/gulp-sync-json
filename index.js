@@ -19,14 +19,16 @@ module.exports = function(primaryFile, options) {
 		throw new PluginError(pluginName, 'Primary file is required');
 	}
 	
-	var directories = {}; // { [path: string]: { source: Vinyl, targets: Vinyl[] }
 	options = merge({
 		report: false,
 		spaces: 4,
 		verbose: false
 	}, options);
+
+	var directories = {}; // { [path: string]: { source: Vinyl, targets: Vinyl[] }
 	var mode = options.report ? modes.report : modes.write;
-	var reportErrors = []; //TODO these are never emitted, can just be string[]
+	var reportErrors = [];
+	var onReportError = Array.prototype.push.bind(reportErrors);
 
 	function intakeFile(file, enc, done) {
 		if (file.isStream()) {
@@ -39,23 +41,21 @@ module.exports = function(primaryFile, options) {
 	}
 
 	function processFiles(done) {
-		this.on('syncError', onSyncError);
+		var handleSyncError = onSyncError.bind(this, mode);
+
+		this.on('syncError', handleSyncError)
+			.on('reportError', onReportError);
+
 		Object.keys(directories).forEach(processDirectory.bind(this));
-		this.removeListener('syncError', onSyncError);
+
+		this.removeListener('syncError', onSyncError)
+			.removeListener('reportError', onReportError);
 
 		if (mode === modes.report && reportErrors.length > 0) {
-			emitReport.call(this);
+			emitReport.call(this, reportErrors);
 		}
 
 		done();
-	}
-
-	function onSyncError(errorMessage) {
-		if (mode === modes.write) {
-			this.emit('error', new PluginError(pluginName, errorMessage));
-		} else {
-			reportErrors.push(errorMessage);
-		}
 	}
 
 	function assignFileToDirectory(file) {
@@ -67,14 +67,6 @@ module.exports = function(primaryFile, options) {
 			dir.targets = dir.targets || [];
 			dir.targets.push(file);
 		}
-	}
-
-	function emitReport() {
-		var allMessages = reportErrors.join(os.EOL);
-		gutil.log(colors.cyan(pluginName), " report found the following:" + os.EOL + allMessages);
-		var errorMessage = 'Report failed with ' + reportErrors.length + ' items';
-		//TODO param for this
-		this.emit('error', new PluginError(pluginName, errorMessage));
 	}
 
 	function processDirectory(directory) {
@@ -144,6 +136,22 @@ module.exports = function(primaryFile, options) {
 
 	return through.obj(intakeFile, processFiles);
 };
+
+function onSyncError(mode, errorMessage) {
+	if (mode === modes.write) {
+		this.emit('error', new PluginError(pluginName, errorMessage));
+	} else {
+		this.emit('reportError', errorMessage);
+	}
+}
+
+function emitReport(failureMessages) {
+	var allMessages = failureMessages.join(os.EOL);
+	gutil.log(colors.cyan(pluginName), " report found the following:" + os.EOL + allMessages);
+	var errorMessage = 'Report failed with ' + failureMessages.length + ' items';
+	//TODO param for this
+	this.emit('error', new PluginError(pluginName, errorMessage));
+}
 
 function syncObjects(source, target) {
 	Object.keys(source).forEach(mergeKey.bind(this, source, target));
