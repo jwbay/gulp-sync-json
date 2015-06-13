@@ -99,7 +99,7 @@ module.exports = function(primaryFile, options) {
 	function syncFiles(sourceFile, targetFiles) {
 		this.push(sourceFile);
 		var sourceObject = fileToObject.call(this, sourceFile);
-		if (sourceObject === null) { return; }
+		if (!checkTypeCanBeSynced.call(this, sourceObject, getFileName(sourceFile))) { return; }
 
 		targetFiles.forEach(syncSingleFile.bind(this, sourceObject));
 	}
@@ -108,7 +108,7 @@ module.exports = function(primaryFile, options) {
 	function syncSingleFile(sourceObject, targetFile) {
 		var fileName = getFileName(targetFile);
 		var targetObject = fileToObject.call(this, targetFile);
-		if (targetObject === null) { return; }
+		if (!checkTypeCanBeSynced.call(this, targetObject, fileName)) { return; }
 
 		var pushedKeys = [];
 		var removedKeys = [];
@@ -188,6 +188,16 @@ function copyValue(sourceValue, target, key) {
 	}
 }
 
+function checkTypeCanBeSynced(obj, fileName) {
+	var typeName = getTypeName(obj);
+	if (typeName !== 'Object') {
+		var errorMessage = colors.cyan(fileName) + ' is a JSON type that cannot be synced: ' + colors.cyan(typeName) + '. Only Objects are supported';
+		this.emit('syncError', errorMessage)
+		return false;
+	}
+	return true;
+}
+
 function fileToObject(file) {
 	var fileName = getFileName(file);
 	var parsedContents;
@@ -202,13 +212,6 @@ function fileToObject(file) {
 	} catch (error) {
 		this.emit('error', error);
 		return;
-	}
-
-	var typeName = getTypeName(parsedContents);
-	if (typeName !== 'Object') {
-		var errorMessage = colors.cyan(fileName) + ' is a JSON type that cannot be synced: ' + colors.cyan(typeName) + '. Only Objects are supported';
-		this.emit('syncError', errorMessage)
-		return null;
 	}
 
 	return parsedContents;
