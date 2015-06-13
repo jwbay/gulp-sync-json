@@ -98,51 +98,43 @@ module.exports = function(primaryFile, options) {
 	}
 
 	//TODO early return causes some files to get dropped from stream in report mode
-	//TODO look into emitting key change events, can gather them here
 	function syncSingleFile(sourceObject, targetFile) {
 		var fileName = getName(targetFile);
 		var targetObject = fileToObject.call(this, targetFile);
 		if (targetObject === null) { return; }
-		var syncResult = syncObjects.call(this, sourceObject, targetObject, fileName);
+
+		var pushedKeys = [];
+		var removedKeys = [];
+		var recordPush = Array.prototype.push.bind(pushedKeys);
+		var recordRemove = Array.prototype.push.bind(removedKeys);
+		this.on('keyPushed', recordPush).on('keyRemoved', recordRemove);
+		syncObjects.call(this, sourceObject, targetObject, fileName);
+		this.removeListener('keyPushed', recordPush).removeListener('keyRemoved', recordRemove);
+
 		if (options.verbose) {
-			logSyncResult(syncResult, fileName, mode);
+			logSyncResult(pushedKeys, removedKeys, fileName, mode);
 		}
+
 		if (mode === modes.write) {
 			targetFile.contents = objectToBuffer(targetObject, options.spaces);
-		} else if (syncResult.pushed.length || syncResult.removed.length) {
+		} else if (pushedKeys.length || removedKeys.length) {
 			reportErrors.push(new PluginError(pluginName, colors.cyan(fileName) + ' contains unaligned key structure'));
 		}
+
 		this.push(targetFile);
 	}
 
 	function syncObjects(source, target, fileName) {
-		var pushedKeys = [];
-		var removedKeys = [];
-		var mergeKeys = mergeKey.bind(this, source, target, fileName);
-		var clearKeys = clearKey.bind(this, source, target);
-
-		Object.keys(source).map(mergeKeys).forEach(function (result) {
-			pushedKeys = pushedKeys.concat(result.pushed);
-			removedKeys = removedKeys.concat(result.removed);
-		});
-
-		Object.keys(target).map(clearKeys).forEach(function (removed) {
-			removedKeys = removedKeys.concat(removed);
-		});
-
-		return {
-			pushed: pushedKeys,
-			removed: removedKeys
-		};
+		Object.keys(source).forEach(mergeKey.bind(this, source, target, fileName));
+		Object.keys(target).forEach(clearKey.bind(this, source, target));
 	}
 
 	//TODO does not log deeply removed keys, need to walk tree and gather key names that have primitive/array values
 	function clearKey(source, target, key) {
 		if (!source.hasOwnProperty(key)) {
 			delete target[key];
-			return [key];
+			this.emit('keyRemoved', key);
 		}
-		return [];
 	}
 
 	function mergeKey(source, target, fileName, key) {
@@ -150,37 +142,29 @@ module.exports = function(primaryFile, options) {
 		var sourceType = getTypeName(sourceValue);
 		var targetValue = target[key];
 		var targetType = getTypeName(targetValue);
-		var nothing = { pushed: [], removed: [] };
-		var result;
 
 		if (target.hasOwnProperty(key)) {
 			if (sourceType === targetType) {
 				if (sourceType === 'Object') {
-					result = syncObjects.call(this, sourceValue, targetValue, fileName);
-				} else {
-					result = nothing;
+					syncObjects.call(this, sourceValue, targetValue, fileName);
 				}
 			} else {
 				var typeMismatchError = makeTypeMismatchError(fileName, key, sourceValue, targetValue);
 				handleError(typeMismatchError, this);
-				result = nothing;
 			}
 		} else {
-			result = copyValue(sourceValue, target, fileName, key);
+			copyValue.call(this, sourceValue, target, fileName, key);
 		}
-
-		return result;
 	};
 
 	function copyValue(sourceValue, target, fileName, key) {
 		if (getTypeName(sourceValue) === 'Object') {
 			target[key] = {};
-			return syncObjects.call(this, sourceValue, target[key], fileName);
+			syncObjects.call(this, sourceValue, target[key], fileName);
+		} else {
+			target[key] = sourceValue;
+			this.emit('keyPushed', key);
 		}
-
-		target[key] = sourceValue;
-
-		return { pushed: [key], removed: [] };
 	}
 
 	function fileToObject(file) {
@@ -247,15 +231,15 @@ function makeTypeMismatchError(fileName, keyName, sourceValue, targetValue) {
 	].join(''));
 }
 
-function logSyncResult(syncResult, fileName, mode) {
+function logSyncResult(pushed, removed, fileName, mode) {
 	var prefix;
-	if (syncResult.pushed.length) {
+	if (pushed.length) {
 		prefix = mode === modes.write ? 'Pushed to' : 'Missing keys in';
-		gutil.log(prefix, colors.cyan(fileName) + ':', getResultString(syncResult.pushed));
+		gutil.log(prefix, colors.cyan(fileName) + ':', getResultString(pushed));
 	}
-	if (syncResult.removed.length) {
+	if (removed.length) {
 		prefix = mode === modes.write ? 'Removed from' : 'Orphaned keys found in';
-		gutil.log(prefix, colors.cyan(fileName) + ':', getResultString(syncResult.removed));
+		gutil.log(prefix, colors.cyan(fileName) + ':', getResultString(removed));
 	}
 }
 
