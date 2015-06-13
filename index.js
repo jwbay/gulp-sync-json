@@ -20,9 +20,8 @@ module.exports = function(primaryFile, options) {
 		spaces: 4,
 		verbose: false
 	}, options);
+
 	var directories = {}; // { [path: string]: { source: Vinyl, targets: Vinyl[] }
-	var reportErrors = [];
-	var onReportError = Array.prototype.push.bind(reportErrors);
 
 	function intakeFile(file, enc, done) {
 		if (file.isStream()) {
@@ -45,16 +44,18 @@ module.exports = function(primaryFile, options) {
 		}
 	}
 
-	function processFiles(done) {
+	function processDirectories(done) {
+		var reportErrors = [];
 		var handleSyncError = onSyncError.bind(this, options.report);
+		var handleReportError = Array.prototype.push.bind(reportErrors);
 
 		this.on('syncError', handleSyncError)
-			.on('reportError', onReportError);
+			.on('reportError', handleReportError);
 
 		Object.keys(directories).forEach(processDirectory.bind(this));
 
 		this.removeListener('syncError', handleSyncError)
-			.removeListener('reportError', onReportError);
+			.removeListener('reportError', handleReportError);
 
 		if (options.report && reportErrors.length > 0) {
 			emitReport.call(this, reportErrors);
@@ -72,7 +73,7 @@ module.exports = function(primaryFile, options) {
 		}
 	}
 
-	return through.obj(intakeFile, processFiles);
+	return through.obj(intakeFile, processDirectories);
 };
 
 //TODO early return causes all target files to get dropped from stream in report mode
@@ -137,14 +138,6 @@ function onSyncError(reportMode, errorMessage) {
 	} else {
 		this.emit('error', new PluginError(pluginName, errorMessage));
 	}
-}
-
-function emitReport(failureMessages) {
-	var allMessages = failureMessages.join(os.EOL);
-	gutil.log(colors.cyan(pluginName), " report found the following:" + os.EOL + allMessages);
-	var errorMessage = 'Report failed with ' + failureMessages.length + ' items';
-	//TODO param for this
-	this.emit('error', new PluginError(pluginName, errorMessage));
 }
 
 function syncObjects(source, target) {
@@ -219,8 +212,8 @@ function fileToObject(file) {
 	return parsedContents;
 }
 
-function getTypeName(o) {
-	var fullName = Object.prototype.toString.call(o);
+function getTypeName(object) {
+	var fullName = Object.prototype.toString.call(object);
 	return fullName.split(' ')[1].slice(0, -1); //[object Number] -> Number
 }
 
@@ -234,13 +227,22 @@ function objectToBuffer(object, spaces) {
 }
 
 function makeTypeMismatchErrorSuffix(keyName, sourceValue, targetValue) {
-	return [' contains type mismatch on key ',
+	return [
+		' contains type mismatch on key ',
 		colors.cyan(keyName),
 		'. Source type ',
 		colors.cyan(typeof sourceValue),
 		', target type ',
 		colors.cyan(typeof targetValue)
 	].join('');
+}
+
+function emitReport(failureMessages) {
+	var allMessages = failureMessages.join(os.EOL);
+	gutil.log(colors.cyan(pluginName), " report found the following:" + os.EOL + allMessages);
+	var errorMessage = 'Report failed with ' + failureMessages.length + ' items';
+	//TODO param for this
+	this.emit('error', new PluginError(pluginName, errorMessage));
 }
 
 function logSyncResult(pushed, removed, fileName, reportMode) {
