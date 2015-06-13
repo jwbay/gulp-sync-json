@@ -179,9 +179,8 @@ module.exports = function(primaryFile, options) {
 				parsedContents = JSON.parse(contents);
 			}
 		} catch (error) {
-			var jsonError = new PluginError(pluginName, colors.cyan(name) + ' contains invalid JSON');
-			handleError(jsonError, this);
-			return null;
+			this.emit('error', error);
+			return;
 		}
 
 		var typeName = getTypeName(parsedContents);

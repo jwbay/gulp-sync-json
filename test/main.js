@@ -1,3 +1,4 @@
+'use strict';
 /* global __dirname, Buffer, describe, it*/
 var gulp = require('gulp');
 var gutil = require('gulp-util');
@@ -237,6 +238,17 @@ describe('gulp-sync-json', function () {
 				.pipe(assert.nth(3, contentsAre({ one: 3 })))
 				.pipe(assert.end(done));
 		});
+
+		it('should emit error when types are mismatched on matching keys', function(done) {
+			var primary = { badKey: 1 };
+			var target = { badKey: "two" };
+			test(primary, target)
+				.pipe(syncJSON('file0.json'))
+				.on('error', function (err) {
+					chalk.stripColor(err.message).should.endWith('contains type mismatch on key badKey. Source type number, target type string');
+					done();
+		        });
+		});
 	});
 
 	describe('verbose logging', function () {
@@ -407,41 +419,6 @@ describe('gulp-sync-json', function () {
 		});
 	});
 
-	describe('error handling', function() {
-		it('should emit error for invalid JSON in primary', function(done) {
-			var primary = "not json";
-			var target = { one: 1 };
-			test(primary, target)
-				.pipe(syncJSON('file0.json'))
-				.on('error', function (err) {
-					chalk.stripColor(err.message).should.endWith('contains invalid JSON');
-					done();
-		        });
-		});
-
-		it('should emit error for invalid JSON in target', function(done) {
-			var primary = { one: 1 };
-			var target = "not json";
-			test(primary, target)
-				.pipe(syncJSON('file0.json'))
-				.on('error', function (err) {
-					chalk.stripColor(err.message).should.endWith('contains invalid JSON');
-					done();
-		        });
-		});
-
-		it('should emit error when types are mismatched on matching keys', function(done) {
-			var primary = { badKey: 1 };
-			var target = { badKey: "two" };
-			test(primary, target)
-				.pipe(syncJSON('file0.json'))
-				.on('error', function (err) {
-					chalk.stripColor(err.message).should.endWith('contains type mismatch on key badKey. Source type number, target type string');
-					done();
-		        });
-		});
-	});
-
 	describe('report mode', function () {		
 		it('should do nothing if targets are synced', function(done) {
 			var primary = { one: 1 };
@@ -453,7 +430,7 @@ describe('gulp-sync-json', function () {
 
 		it('should supress multiple errors and emit once', function(done) {
 			var primary = { one: 1 };
-			var targetOne = "not json";
+			var targetOne = { one: "two" };
 			var targetTwo = { bad: "key" };
 			var targetThree = [];
 			var logged = getGulpLog();
@@ -469,7 +446,7 @@ describe('gulp-sync-json', function () {
 
 		it('should capture multiple errors and log them before emitting the report error', function(done) {
 			var primary = { one: 1 };
-			var targetOne = "not json";
+			var targetOne = { one: "two" };
 			var targetTwo = { bad: "key" };
 			var targetThree = [];
 			var logged = getGulpLog();
@@ -484,7 +461,7 @@ describe('gulp-sync-json', function () {
 							return m.trim();
 						});
 					errorMessages.length.should.eql(3);
-					errorMessages[0].should.endWith('contains invalid JSON');
+					errorMessages[0].should.endWith('contains type mismatch on key one. Source type number, target type string');
 					errorMessages[1].should.endWith('contains unaligned key structure');
 					errorMessages[2].should.endWith('is a JSON type that cannot be synced: Array. Only Objects are supported');
 					logged.restore();
