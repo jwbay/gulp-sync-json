@@ -142,77 +142,77 @@ module.exports = function(primaryFile, options) {
 		this.push(targetFile);
 	}
 
-	function syncObjects(source, target) {
-		Object.keys(source).forEach(mergeKey.bind(this, source, target));
-		Object.keys(target).forEach(clearKey.bind(this, source, target));
-	}
-
-	//TODO does not log deeply removed keys, need to walk tree and gather key names that have primitive/array values
-	function clearKey(source, target, key) {
-		if (!source.hasOwnProperty(key)) {
-			delete target[key];
-			this.emit('keyRemoved', key);
-		}
-	}
-
-	function mergeKey(source, target, key) {
-		var sourceValue = source[key];
-		var sourceType = getTypeName(sourceValue);
-		var targetValue = target[key];
-		var targetType = getTypeName(targetValue);
-
-		if (target.hasOwnProperty(key)) {
-			if (sourceType === targetType) {
-				if (sourceType === 'Object') {
-					syncObjects.call(this, sourceValue, targetValue);
-				}
-			} else {
-				var errorMessage = makeTypeMismatchErrorSuffix(key, sourceValue, targetValue);
-				this.emit('keyTypeMismatch', errorMessage);
-			}
-		} else {
-			copyValue.call(this, sourceValue, target, key);
-		}
-	};
-
-	function copyValue(sourceValue, target, key) {
-		if (getTypeName(sourceValue) === 'Object') {
-			target[key] = {};
-			syncObjects.call(this, sourceValue, target[key]);
-		} else {
-			target[key] = sourceValue;
-			this.emit('keyPushed', key);
-		}
-	}
-
-	function fileToObject(file) {
-		var fileName = getFileName(file);
-		var parsedContents;
-
-		try {
-			var contents = file.contents.toString().trim();
-			if (!contents) {
-				parsedContents = {};
-			} else {
-				parsedContents = JSON.parse(contents);
-			}
-		} catch (error) {
-			this.emit('error', error);
-			return;
-		}
-
-		var typeName = getTypeName(parsedContents);
-		if (typeName !== 'Object') {
-			var errorMessage = colors.cyan(fileName) + ' is a JSON type that cannot be synced: ' + colors.cyan(typeName) + '. Only Objects are supported';
-			this.emit('syncError' , errorMessage)
-			return null;
-		}
-
-		return parsedContents;
-	}
-
 	return through.obj(intakeFile, processFiles);
 };
+
+function syncObjects(source, target) {
+	Object.keys(source).forEach(mergeKey.bind(this, source, target));
+	Object.keys(target).forEach(clearKey.bind(this, source, target));
+}
+
+//TODO does not log deeply removed keys, need to walk tree and gather key names that have primitive/array values
+function clearKey(source, target, key) {
+	if (!source.hasOwnProperty(key)) {
+		delete target[key];
+		this.emit('keyRemoved', key);
+	}
+}
+
+function mergeKey(source, target, key) {
+	var sourceValue = source[key];
+	var sourceType = getTypeName(sourceValue);
+	var targetValue = target[key];
+	var targetType = getTypeName(targetValue);
+
+	if (target.hasOwnProperty(key)) {
+		if (sourceType === targetType) {
+			if (sourceType === 'Object') {
+				syncObjects.call(this, sourceValue, targetValue);
+			}
+		} else {
+			var errorMessage = makeTypeMismatchErrorSuffix(key, sourceValue, targetValue);
+			this.emit('keyTypeMismatch', errorMessage);
+		}
+	} else {
+		copyValue.call(this, sourceValue, target, key);
+	}
+};
+
+function copyValue(sourceValue, target, key) {
+	if (getTypeName(sourceValue) === 'Object') {
+		target[key] = {};
+		syncObjects.call(this, sourceValue, target[key]);
+	} else {
+		target[key] = sourceValue;
+		this.emit('keyPushed', key);
+	}
+}
+
+function fileToObject(file) {
+	var fileName = getFileName(file);
+	var parsedContents;
+
+	try {
+		var contents = file.contents.toString().trim();
+		if (!contents) {
+			parsedContents = {};
+		} else {
+			parsedContents = JSON.parse(contents);
+		}
+	} catch (error) {
+		this.emit('error', error);
+		return;
+	}
+
+	var typeName = getTypeName(parsedContents);
+	if (typeName !== 'Object') {
+		var errorMessage = colors.cyan(fileName) + ' is a JSON type that cannot be synced: ' + colors.cyan(typeName) + '. Only Objects are supported';
+		this.emit('syncError', errorMessage)
+		return null;
+	}
+
+	return parsedContents;
+}
 
 function getTypeName(o) {
 	var fullName = Object.prototype.toString.call(o);
