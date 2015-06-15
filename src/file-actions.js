@@ -5,13 +5,14 @@ var syncObjects = require('./sync-objects');
 var logResult = require('./log-file-result');
 var colors = gutil.colors;
 
-//TODO early return causes all target files to get dropped from stream in report mode
 exports.sync = function(sourceFile, targetFiles, options) {
 	this.push(sourceFile);
+	var fileName = utils.getFileName(sourceFile);
 	var sourceObject = utils.fileToObject.call(this, sourceFile);
-	if (sourceObject === void 0) { return; }
-	if (!checkFileRootTypeCanBeSynced.call(this, sourceObject, utils.getFileName(sourceFile))) { return; }
-
+	if (sourceObject === void 0 || !checkFileRootTypeCanBeSynced.call(this, sourceObject, fileName)) {
+		targetFiles.forEach(this.push.bind(this));
+		return;
+	}
 	targetFiles.forEach(syncSingleFile.bind(this, options, sourceObject));
 };
 
