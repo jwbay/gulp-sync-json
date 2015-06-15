@@ -9,7 +9,7 @@ var colors = gutil.colors;
 exports.sync = function(sourceFile, targetFiles, options) {
 	this.push(sourceFile);
 	var sourceObject = utils.fileToObject.call(this, sourceFile);
-	if (!checkTypeCanBeSynced.call(this, sourceObject, utils.getFileName(sourceFile))) { return; }
+	if (!checkFileRootTypeCanBeSynced.call(this, sourceObject, utils.getFileName(sourceFile))) { return; }
 
 	targetFiles.forEach(syncSingleFile.bind(this, options, sourceObject));
 };
@@ -27,7 +27,7 @@ exports.ignore = function(sourceFile, targetFiles) {
 function syncSingleFile(options, sourceObject, targetFile) {
 	var fileName = utils.getFileName(targetFile);
 	var targetObject = utils.fileToObject.call(this, targetFile);
-	if (!checkTypeCanBeSynced.call(this, targetObject, fileName)) { return; }
+	if (!checkFileRootTypeCanBeSynced.call(this, targetObject, fileName)) { return; }
 
 	var pushedKeys = [];
 	var removedKeys = [];
@@ -61,7 +61,7 @@ function syncSingleFile(options, sourceObject, targetFile) {
 	this.push(targetFile);
 }
 
-function checkTypeCanBeSynced(obj, fileName) {
+function checkFileRootTypeCanBeSynced(obj, fileName) {
 	var typeName = utils.getTypeName(obj);
 	if (typeName !== 'Object') {
 		var errorMessage = [

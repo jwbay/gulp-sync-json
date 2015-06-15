@@ -245,7 +245,7 @@ describe('gulp-sync-json', function () {
 			test(primary, target)
 				.pipe(syncJSON('file0.json'))
 				.on('error', function (err) {
-					chalk.stripColor(err.message).should.endWith('contains type mismatch on key badKey. Source type number, target type string');
+					chalk.stripColor(err.message).should.endWith('contains type mismatch on key badKey. Source type Number, target type String');
 					done();
 		        });
 		});
@@ -461,7 +461,7 @@ describe('gulp-sync-json', function () {
 							return m.trim();
 						});
 					errorMessages.length.should.eql(3);
-					errorMessages[0].should.endWith('contains type mismatch on key one. Source type number, target type string');
+					errorMessages[0].should.endWith('contains type mismatch on key one. Source type Number, target type String');
 					errorMessages[1].should.endWith('contains unaligned key structure');
 					errorMessages[2].should.endWith('is a JSON type that cannot be synced: Array. Only Objects are supported');
 					logged.restore();

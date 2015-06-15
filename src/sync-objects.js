@@ -30,7 +30,7 @@ function mergeKey(source, target, key) {
 			//base case 2: source and target agree on key name and value type,
 			//so keep target value intact by doing nothing
 		} else {
-			var errorMessage = makeTypeMismatchErrorSuffix(key, sourceValue, targetValue);
+			var errorMessage = makeTypeMismatchErrorSuffix(key, sourceType, targetType);
 			this.emit('keyTypeMismatch', errorMessage);
 		}
 	} else {
@@ -49,13 +49,13 @@ function copyValue(sourceValue, target, key) {
 	}
 }
 
-function makeTypeMismatchErrorSuffix(keyName, sourceValue, targetValue) {
+function makeTypeMismatchErrorSuffix(keyName, sourceType, targetType) {
 	return [
 		' contains type mismatch on key ',
 		colors.cyan(keyName),
 		'. Source type ',
-		colors.cyan(typeof sourceValue),
+		colors.cyan(sourceType),
 		', target type ',
-		colors.cyan(typeof targetValue)
+		colors.cyan(targetType)
 	].join('');
 }

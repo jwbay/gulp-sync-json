@@ -62,7 +62,7 @@ module.exports = function(primaryFile, options) {
 			.removeListener('reportError', handleReportError);
 
 		if (options.report && reportErrors.length > 0) {
-			emitReport.call(this, reportErrors);
+			outputReport.call(this, reportErrors);
 		}
 
 		done();
@@ -88,7 +88,7 @@ function onSyncError(reportMode, errorMessage) {
 	}
 }
 
-function emitReport(failureMessages) {
+function outputReport(failureMessages) {
 	var allMessages = failureMessages.join(os.EOL);
 	gutil.log(colors.cyan(pluginName), " report found the following:" + os.EOL + allMessages);
 	var errorMessage = 'Report failed with ' + failureMessages.length + ' items';
