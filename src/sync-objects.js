@@ -18,7 +18,7 @@ function mergeKey(source, target, key) {
 			if (sourceType === 'Object') {
 				syncObjects.call(this, sourceValue, targetValue);
 			}
-			//base case 2: source and target agree on key name and value type,
+			//base case 1: source and target agree on key name and value type,
 			//so keep target value intact by doing nothing
 		} else {
 			var errorMessage = makeTypeMismatchErrorSuffix(key, sourceType, targetType);
@@ -35,39 +35,43 @@ function copyValue(sourceValue, target, key) {
 		//could just set target[key] instead of calling sync but we'd lose logging
 		syncObjects.call(this, sourceValue, target[key]);
 	} else {
-		//base case 3: source contains key not present in target; copy it
+		//base case 2: source contains key not present in target; copy it
 		target[key] = sourceValue;
 		this.emit('keyPushed', key);
 	}
 }
 
 function clearKey(source, target, key) {
+	var logRemoval = this.emit.bind(this, 'keyRemoved');
 	if (!source.hasOwnProperty(key)) {
 		if (utils.getTypeName(target[key]) === 'Object') {
-			gatherPrimitiveKeyNames(target[key]).forEach(function(key) {
-				this.emit('keyRemoved', key);
-			}, this);
+			gatherPrimitiveKeyNames(target[key]).forEach(logRemoval);
 		} else {
-			this.emit('keyRemoved', key);
+			logRemoval(key);
 		}
-		//base case 1: target contains key not present in source; clear it
+		//base case 3: target contains key not present in source; clear it
 		delete target[key];	
 	}
 }
 
 function gatherPrimitiveKeyNames(object) {
-	return Object.keys(object).map(function(key) {
-		if (utils.getTypeName(object[key]) === 'Object') {
-			return gatherPrimitiveKeyNames(object[key]);
-		} else {
-			return [key];
-		}
-	}).reduce(function(prev, current) {
-		for (var i = 0; i < current.length; i++) {
-			prev = prev.concat(current[i]);
-		}
-		return prev;
-	}, []);
+	return Object.keys(object)
+		.map(gatherSingleKeyPrimitives.bind(this, object))
+		.reduce(flatten, []);
+}
+
+function gatherSingleKeyPrimitives(object, key) {
+	if (utils.getTypeName(object[key]) === 'Object') {
+		return gatherPrimitiveKeyNames(object[key]);
+	} else {
+		return [key];
+	}
+}
+
+function flatten(flattened, arrayOfArrays) {
+	return arrayOfArrays.map(function(array) {
+		return flattened.concat(array);
+	});
 }
 
 function makeTypeMismatchErrorSuffix(keyName, sourceType, targetType) {
