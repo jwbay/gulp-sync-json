@@ -5,6 +5,7 @@ var gutil = require('gulp-util');
 var through = require('through2');
 var merge = require('merge');
 var os = require('os');
+var fileActions = require('./src/file-actions'); 
 
 var PluginError = gutil.PluginError;
 var colors = gutil.colors;
@@ -49,6 +50,9 @@ module.exports = function(primaryFile, options) {
 		var handleSyncError = onSyncError.bind(this, options.report);
 		var handleReportError = Array.prototype.push.bind(reportErrors);
 
+		//syncErrors will either be gathered for logging or promoted to actual 
+		//errors on the stream depending on report mode;
+		//reportErrors are always gathered and never promoted
 		this.on('syncError', handleSyncError)
 			.on('reportError', handleReportError);
 
@@ -67,70 +71,14 @@ module.exports = function(primaryFile, options) {
 	function processDirectory(directory) {
 		var dir = directories[directory];
 		if (dir.source && dir.targets && dir.targets.length > 0) {
-			syncFiles.call(this, dir.source, dir.targets, options);
+			fileActions.sync.call(this, dir.source, dir.targets, options);
 		} else {
-			ignoreFiles.call(this, dir.source, dir.targets);
+		 	fileActions.ignore.call(this, dir.source, dir.targets);
 		}
 	}
 
 	return through.obj(intakeFile, processDirectories);
 };
-
-//TODO early return causes all target files to get dropped from stream in report mode
-function syncFiles(sourceFile, targetFiles, options) {
-	this.push(sourceFile);
-	var sourceObject = fileToObject.call(this, sourceFile);
-	if (!checkTypeCanBeSynced.call(this, sourceObject, getFileName(sourceFile))) { return; }
-
-	targetFiles.forEach(syncSingleFile.bind(this, options, sourceObject));
-}
-
-//TODO early return causes some files to get dropped from stream in report mode
-function syncSingleFile(options, sourceObject, targetFile) {
-	var fileName = getFileName(targetFile);
-	var targetObject = fileToObject.call(this, targetFile);
-	if (!checkTypeCanBeSynced.call(this, targetObject, fileName)) { return; }
-
-	var pushedKeys = [];
-	var removedKeys = [];
-	var onKeyPush = Array.prototype.push.bind(pushedKeys);
-	var onKeyRemove = Array.prototype.push.bind(removedKeys);
-	var onKeyTypeMismatch = function (errorMessageSuffix) {
-		this.emit('syncError', colors.cyan(fileName) + errorMessageSuffix);
-	};
-
-	this.on('keyPushed', onKeyPush)
-		.on('keyRemoved', onKeyRemove)
-		.on('keyTypeMismatch', onKeyTypeMismatch);
-
-	syncObjects.call(this, sourceObject, targetObject, fileName);
-
-	this.removeListener('keyPushed', onKeyPush)
-		.removeListener('keyRemoved', onKeyRemove)
-		.removeListener('keyTypeMismatch', onKeyTypeMismatch);
-
-
-	if (options.verbose) {
-		logSyncResult(pushedKeys, removedKeys, fileName, options.report);
-	}
-
-	if (options.report && (pushedKeys.length || removedKeys.length)) {
-		this.emit('reportError', colors.cyan(fileName) + ' contains unaligned key structure');
-	} else {
-		targetFile.contents = objectToBuffer(targetObject, options.spaces);
-	}
-
-	this.push(targetFile);
-}
-
-function ignoreFiles(source, targets) {
-	if (source) {
-		this.push(source);
-	}
-	if (targets) {
-		targets.forEach(this.push.bind(this));
-	}
-}
 
 function onSyncError(reportMode, errorMessage) {
 	if (reportMode) {
@@ -140,137 +88,10 @@ function onSyncError(reportMode, errorMessage) {
 	}
 }
 
-function syncObjects(source, target) {
-	Object.keys(source).forEach(mergeKey.bind(this, source, target));
-	Object.keys(target).forEach(clearKey.bind(this, source, target));
-}
-
-//TODO does not log deeply removed keys, need to walk tree and gather key names that have primitive/array values
-function clearKey(source, target, key) {
-	if (!source.hasOwnProperty(key)) {
-		delete target[key];
-		this.emit('keyRemoved', key);
-	}
-}
-
-function mergeKey(source, target, key) {
-	var sourceValue = source[key];
-	var sourceType = getTypeName(sourceValue);
-	var targetValue = target[key];
-	var targetType = getTypeName(targetValue);
-
-	if (target.hasOwnProperty(key)) {
-		if (sourceType === targetType) {
-			if (sourceType === 'Object') {
-				syncObjects.call(this, sourceValue, targetValue);
-			}
-		} else {
-			var errorMessage = makeTypeMismatchErrorSuffix(key, sourceValue, targetValue);
-			this.emit('keyTypeMismatch', errorMessage);
-		}
-	} else {
-		copyValue.call(this, sourceValue, target, key);
-	}
-};
-
-function copyValue(sourceValue, target, key) {
-	if (getTypeName(sourceValue) === 'Object') {
-		target[key] = {};
-		syncObjects.call(this, sourceValue, target[key]);
-	} else {
-		target[key] = sourceValue;
-		this.emit('keyPushed', key);
-	}
-}
-
-function checkTypeCanBeSynced(obj, fileName) {
-	var typeName = getTypeName(obj);
-	if (typeName !== 'Object') {
-		var errorMessage = colors.cyan(fileName) + ' is a JSON type that cannot be synced: ' + colors.cyan(typeName) + '. Only Objects are supported';
-		this.emit('syncError', errorMessage)
-		return false;
-	}
-	return true;
-}
-
-function fileToObject(file) {
-	var fileName = getFileName(file);
-	var parsedContents;
-
-	try {
-		var contents = file.contents.toString().trim();
-		if (!contents) {
-			parsedContents = {};
-		} else {
-			parsedContents = JSON.parse(contents);
-		}
-	} catch (error) {
-		this.emit('error', error);
-		return;
-	}
-
-	return parsedContents;
-}
-
-function getTypeName(object) {
-	var fullName = Object.prototype.toString.call(object);
-	return fullName.split(' ')[1].slice(0, -1); //[object Number] -> Number
-}
-
-function getFileName(file) {
-	return file.path.replace(file.cwd, '');
-}
-
-function objectToBuffer(object, spaces) {
-	var contents = JSON.stringify(object, null, spaces);
-	return new Buffer(contents);
-}
-
-function makeTypeMismatchErrorSuffix(keyName, sourceValue, targetValue) {
-	return [
-		' contains type mismatch on key ',
-		colors.cyan(keyName),
-		'. Source type ',
-		colors.cyan(typeof sourceValue),
-		', target type ',
-		colors.cyan(typeof targetValue)
-	].join('');
-}
-
 function emitReport(failureMessages) {
 	var allMessages = failureMessages.join(os.EOL);
 	gutil.log(colors.cyan(pluginName), " report found the following:" + os.EOL + allMessages);
 	var errorMessage = 'Report failed with ' + failureMessages.length + ' items';
 	//TODO param for this
 	this.emit('error', new PluginError(pluginName, errorMessage));
-}
-
-function logSyncResult(pushed, removed, fileName, reportMode) {
-	var prefix;
-	if (pushed.length) {
-		prefix = reportMode ? 'Missing keys in' : 'Pushed to';
-		gutil.log(prefix, colors.cyan(fileName) + ':', getResultString(pushed));
-	}
-	if (removed.length) {
-		prefix = reportMode ? 'Orphaned keys found in' : 'Removed from';
-		gutil.log(prefix, colors.cyan(fileName) + ':', getResultString(removed));
-	}
-}
-
-function getResultString(keysArray) {
-	if (keysArray.length <= 3) {
-		return stringifyKeyList(keysArray);
-	}
-	return [
-		stringifyKeyList(keysArray.slice(0, 3)),
-		' and ',
-		colors.magenta(keysArray.length - 3),
-		' more'
-	].join('');
-}
-
-function stringifyKeyList(array) {
-	return array.map(function(key) {
-		return colors.cyan(key);
-	}).join(', ');
 }
