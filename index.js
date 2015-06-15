@@ -15,7 +15,7 @@ module.exports = function(primaryFile, options) {
 	if (!primaryFile) {
 		throw new PluginError(pluginName, 'Primary file is required');
 	}
-	
+
 	options = merge({
 		report: false,
 		errorOnReportFail: false,
@@ -82,7 +82,7 @@ module.exports = function(primaryFile, options) {
 		if (reportMode) {
 			this.emit('reportError', errorMessage);
 		} else {
-			this.emit('error', new PluginError(pluginName, errorMessage));
+			this.emit('error', new PluginError(pluginName, colors.stripColor(errorMessage)));
 		}
 	}
 
