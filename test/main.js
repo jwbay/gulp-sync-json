@@ -313,10 +313,10 @@ describe('gulp-sync-json', function () {
 					log[0].should.containEql('three');
 					log.restore();
 					done();
-				}))
+				}));
 		});
 
-		it.skip('should log nested key removals', function (done) {
+		it('should log nested key removals', function (done) {
 			var primary = {};
 			var target = {
 				one: 1,
@@ -337,7 +337,7 @@ describe('gulp-sync-json', function () {
 					log[0].should.containEql('three');
 					log.restore();
 					done();
-				}))
+				}));
 		});
 	});
 

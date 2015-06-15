@@ -7,15 +7,6 @@ var syncObjects = module.exports = function(source, target) {
 	Object.keys(target).forEach(clearKey.bind(this, source, target));
 };
 
-//TODO does not log deeply removed keys, need to walk tree and gather key names that have primitive/array values
-function clearKey(source, target, key) {
-	if (!source.hasOwnProperty(key)) {
-		//base case 1: target contains key not present in source; clear it
-		delete target[key];
-		this.emit('keyRemoved', key);
-	}
-}
-
 function mergeKey(source, target, key) {
 	var sourceValue = source[key];
 	var sourceType = utils.getTypeName(sourceValue);
@@ -48,6 +39,35 @@ function copyValue(sourceValue, target, key) {
 		target[key] = sourceValue;
 		this.emit('keyPushed', key);
 	}
+}
+
+function clearKey(source, target, key) {
+	if (!source.hasOwnProperty(key)) {
+		if (utils.getTypeName(target[key]) === 'Object') {
+			gatherPrimitiveKeyNames(target[key]).forEach(function(key) {
+				this.emit('keyRemoved', key);
+			}, this);
+		} else {
+			this.emit('keyRemoved', key);
+		}
+		//base case 1: target contains key not present in source; clear it
+		delete target[key];	
+	}
+}
+
+function gatherPrimitiveKeyNames(object) {
+	return Object.keys(object).map(function(key) {
+		if (utils.getTypeName(object[key]) === 'Object') {
+			return gatherPrimitiveKeyNames(object[key]);
+		} else {
+			return [key];
+		}
+	}).reduce(function(prev, current) {
+		for (var i = 0; i < current.length; i++) {
+			prev = prev.concat(current[i]);
+		}
+		return prev;
+	}, []);
 }
 
 function makeTypeMismatchErrorSuffix(keyName, sourceType, targetType) {
