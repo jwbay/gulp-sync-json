@@ -79,8 +79,10 @@ gulp.task('sync-json', function() {
 
 ```typescript
 syncJSON(primaryFile: string, options?: {
-    report: boolean,
-    spaces: number
+    report?: boolean,
+    errorOnReportFail?: boolean,
+    spaces?: number,
+    verbose?: boolean    
 })
 ```
 
@@ -89,15 +91,19 @@ A filename, or the basename portion of a path, that is the source of truth for
 key structure for every other JSON file in the directory
 
 #### options
-An optional options object. The following properties are supported:
+An optional options object. The following properties are supported; all are optional:
 
 * `report` - Default `false`. If set to `true`, the plugin will audit
 files instead of changing them on the filesystem. Key mismatches are
-treated as errors, and all errors, including invalid/unsupported JSON,
-are supressed and collected instead of being emitted onto the stream
-as they occur. If the audit finds anything it will log everything out
-at the end then emit one error onto the stream. Especially valuable
-as part of a CI/build server step
+treated as errors and (almost) all errors are supressed and collected
+instead of being emitted onto the stream as they occur. If the audit
+finds anything it will log everything out at the end
+* `errorOnReportFail` - Default `false`. If set to `true`, the plugin
+will emit an error onto the stream if `report` mode finds anything.
+Since this causes gulp to exit with a non-zero exit code, it's possible
+to fail a CI/build step with this. The error is emitted after auditing
+all files in the stream, and after logging the report output. Has no
+effect if `report` is `false`
 * `spaces` - Default `4`. How many spaces to use when formatting JSON.
 Passed directly to JSON.stringify
 * `verbose` - Default `false`. If set to `true`, the plugin will
@@ -117,6 +123,10 @@ not match, the plugin will emit an error with the file, key, and types
 * The plugin only cares about files in directories with both a primary file and
 other files present. Any files in the stream that aren't in such a directory
 are piped through untouched
+* For files it does care about, the plugin will emit an error when it encounters
+invalid JSON, whether in report mode or not. There are a couple gulp plugins
+already available for linting JSON, which can sit in front of this plugin
+on the stream
 
 Need to handle line endings differently? Pipe the results through 
 [gulp-eol](https://www.npmjs.com/package/gulp-eol).
