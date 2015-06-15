@@ -37,6 +37,8 @@ function syncSingleFile(options, sourceObject, targetFile) {
 	var removedKeys = [];
 	var onKeyPush = Array.prototype.push.bind(pushedKeys);
 	var onKeyRemove = Array.prototype.push.bind(removedKeys);
+	//this just bubbles up a syncError, but having it here means object sync code doesn't have
+	//to pass around a filename all over the place
 	var onKeyTypeMismatch = function (errorMessageSuffix) {
 		this.emit('syncError', colors.cyan(fileName) + errorMessageSuffix);
 	};
@@ -45,12 +47,11 @@ function syncSingleFile(options, sourceObject, targetFile) {
 		.on('keyRemoved', onKeyRemove)
 		.on('keyTypeMismatch', onKeyTypeMismatch);
 
-	syncObjects.call(this, sourceObject, targetObject, fileName);
+	syncObjects.call(this, sourceObject, targetObject);
 
 	this.removeListener('keyPushed', onKeyPush)
 		.removeListener('keyRemoved', onKeyRemove)
 		.removeListener('keyTypeMismatch', onKeyTypeMismatch);
-
 
 	if (options.verbose) {
 		logResult(pushedKeys, removedKeys, fileName, options.report);
