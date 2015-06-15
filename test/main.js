@@ -510,14 +510,18 @@ describe('gulp-sync-json', function () {
 				}));
 		});
 		
-		it.skip('should not drop files from stream when a target is bad', function(done) {
+		it('should not drop files from stream when a target is bad', function(done) {
 			var primary = { one: 'one' };
 			var targetOne = [];
-			var targetTwo = { two: 'two' };
+			var targetTwo = [];
+			var log = getGulpLog();
 			test(primary, targetOne, targetTwo)
 				.pipe(syncJSON('file0.json', { report: true }))
 				.pipe(assert.length(3))
-				.pipe(assert.end(done));
+				.pipe(assert.end(function() {
+					log.restore();
+					done();
+				}));
 		});
 	});
 });

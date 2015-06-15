@@ -25,12 +25,13 @@ exports.ignore = function(sourceFile, targetFiles) {
 	}
 };
 
-//TODO early return causes some files to get dropped from stream in report mode
 function syncSingleFile(options, sourceObject, targetFile) {
 	var fileName = utils.getFileName(targetFile);
 	var targetObject = utils.fileToObject.call(this, targetFile);
-	if (targetObject === void 0) { return; }
-	if (!checkFileRootTypeCanBeSynced.call(this, targetObject, fileName)) { return; }
+	if (targetObject === void 0 || !checkFileRootTypeCanBeSynced.call(this, targetObject, fileName)) {
+		this.push(targetFile);
+		return;
+	}
 
 	var pushedKeys = [];
 	var removedKeys = [];
