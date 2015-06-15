@@ -10,7 +10,6 @@ exports.fileToObject = function(file) {
 		}
 	} catch (error) {
 		this.emit('error', error);
-		return null;
 	}
 };
 

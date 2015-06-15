@@ -367,7 +367,7 @@ describe('gulp-sync-json', function () {
 		});
 	});
 
-	describe('bad targets', function() {
+	describe('bad targets', function() {		
 		it('should emit error when trying to sync against an array', function(done) {
 			var primary = { one: 1 };
 			test(primary, [0, 1])
@@ -390,7 +390,7 @@ describe('gulp-sync-json', function () {
 
 		it('should emit error when trying to sync against a string', function(done) {
 			var primary = { one: 1 };
-			test(primary, "\"hello world\"")
+			test(primary, '"hello world"')
 				.pipe(syncJSON('file0.json'))
 				.on('error', function (err) {
 					chalk.stripColor(err.message).should.endWith('is a JSON type that cannot be synced: String. Only Objects are supported');
@@ -430,31 +430,58 @@ describe('gulp-sync-json', function () {
 
 		it('should supress multiple errors and emit once', function(done) {
 			var primary = { one: 1 };
-			var targetOne = { one: "two" };
-			var targetTwo = { bad: "key" };
+			var targetOne = { one: 'two' };
+			var targetTwo = { bad: 'key' };
 			var targetThree = [];
-			var logged = getGulpLog();
+			var log = getGulpLog();
 
 			test(primary, targetOne, targetTwo, targetThree)
-				.pipe(syncJSON('file0.json', { report: true }))
+				.pipe(syncJSON('file0.json', { report: true, errorOnReportFail: true }))
 				.on('error', function (err) {
 					err.message.should.eql('Report failed with 3 items');
-					logged.restore();
+					log.restore();
+					done();
+				});
+		});
+		
+		it('should not emit an error without the errorOnReportFail set', function(done) {
+			var primary = { one: 1 };
+			var targetOne = { one: 'two' };
+			var targetTwo = { bad: 'key' };
+			var targetThree = [];
+			var log = getGulpLog();
+			test(primary, targetOne, targetTwo, targetThree)
+				.pipe(syncJSON('file0.json', { report: true }))
+				.pipe(assert.end(function() {
+					log.restore();
+					done();
+				}));
+		});
+		
+		it('should emit an error for invalid JSON even in report mode', function(done) {
+			var primary = 'not json';
+			var target = {};
+			var log = getGulpLog();
+			test(primary, target)
+				.pipe(syncJSON('file0.json', { report: true }))
+				.on('error', function(e) {
+					e.message.should.eql('Unexpected token o');
+					log.restore();
 					done();
 				});
 		});
 
-		it('should capture multiple errors and log them before emitting the report error', function(done) {
+		it('should capture multiple errors and log them', function(done) {
 			var primary = { one: 1 };
-			var targetOne = { one: "two" };
-			var targetTwo = { bad: "key" };
+			var targetOne = { one: 'two' };
+			var targetTwo = { bad: 'key' };
 			var targetThree = [];
-			var logged = getGulpLog();
+			var log = getGulpLog();
 
 			test(primary, targetOne, targetTwo, targetThree)
 				.pipe(syncJSON('file0.json', { report: true }))
-				.on('error', function (err) {
-					var errorMessages = logged[0]
+				.pipe(assert.end(function() {
+					var errorMessages = log[0]
 						.split(gutil.linefeed)
 						.slice(1)
 						.map(function(m) {
@@ -464,9 +491,29 @@ describe('gulp-sync-json', function () {
 					errorMessages[0].should.endWith('contains type mismatch on key one. Source type Number, target type String');
 					errorMessages[1].should.endWith('contains unaligned key structure');
 					errorMessages[2].should.endWith('is a JSON type that cannot be synced: Array. Only Objects are supported');
-					logged.restore();
+					log.restore();
 					done();
-				});
+				}));
+		});
+		
+		it.skip('should not drop files from stream when primary is bad', function(done) {
+			var primary = [];
+			var targetOne = { one: 'one' };
+			var targetTwo = { two: 'two' };
+			test(primary, targetOne, targetTwo)
+				.pipe(syncJSON('file0.json', { report: true }))
+				.pipe(assert.length(3))
+				.pipe(assert.end(done));
+		});
+		
+		it.skip('should not drop files from stream when a target is bad', function(done) {
+			var primary = { one: 'one' };
+			var targetOne = [];
+			var targetTwo = { two: 'two' };
+			test(primary, targetOne, targetTwo)
+				.pipe(syncJSON('file0.json', { report: true }))
+				.pipe(assert.length(3))
+				.pipe(assert.end(done));
 		});
 	});
 });

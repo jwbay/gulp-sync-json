@@ -18,6 +18,7 @@ module.exports = function(primaryFile, options) {
 	
 	options = merge({
 		report: false,
+		errorOnReportFail: false,
 		spaces: 4,
 		verbose: false
 	}, options);
@@ -77,21 +78,21 @@ module.exports = function(primaryFile, options) {
 		}
 	}
 
+	function onSyncError(reportMode, errorMessage) {
+		if (reportMode) {
+			this.emit('reportError', errorMessage);
+		} else {
+			this.emit('error', new PluginError(pluginName, errorMessage));
+		}
+	}
+
+	function outputReport(failureMessages) {
+		var allMessages = failureMessages.join(os.EOL);
+		gutil.log(colors.cyan(pluginName), ' report found the following:' + os.EOL + allMessages);
+		if (options.errorOnReportFail) {
+			this.emit('error', new PluginError(pluginName, 'Report failed with ' + failureMessages.length + ' items'));
+		}
+	}
+
 	return through.obj(intakeFile, processDirectories);
 };
-
-function onSyncError(reportMode, errorMessage) {
-	if (reportMode) {
-		this.emit('reportError', errorMessage);
-	} else {
-		this.emit('error', new PluginError(pluginName, errorMessage));
-	}
-}
-
-function outputReport(failureMessages) {
-	var allMessages = failureMessages.join(os.EOL);
-	gutil.log(colors.cyan(pluginName), " report found the following:" + os.EOL + allMessages);
-	var errorMessage = 'Report failed with ' + failureMessages.length + ' items';
-	//TODO param for this
-	this.emit('error', new PluginError(pluginName, errorMessage));
-}

@@ -9,6 +9,7 @@ var colors = gutil.colors;
 exports.sync = function(sourceFile, targetFiles, options) {
 	this.push(sourceFile);
 	var sourceObject = utils.fileToObject.call(this, sourceFile);
+	if (sourceObject === void 0) { return; }
 	if (!checkFileRootTypeCanBeSynced.call(this, sourceObject, utils.getFileName(sourceFile))) { return; }
 
 	targetFiles.forEach(syncSingleFile.bind(this, options, sourceObject));
@@ -27,6 +28,7 @@ exports.ignore = function(sourceFile, targetFiles) {
 function syncSingleFile(options, sourceObject, targetFile) {
 	var fileName = utils.getFileName(targetFile);
 	var targetObject = utils.fileToObject.call(this, targetFile);
+	if (targetObject === void 0) { return; }
 	if (!checkFileRootTypeCanBeSynced.call(this, targetObject, fileName)) { return; }
 
 	var pushedKeys = [];

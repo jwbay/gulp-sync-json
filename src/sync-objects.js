@@ -41,6 +41,7 @@ function mergeKey(source, target, key) {
 function copyValue(sourceValue, target, key) {
 	if (utils.getTypeName(sourceValue) === 'Object') {
 		target[key] = {};
+		//could just set target[key] instead of calling sync but we'd lose logging
 		syncObjects.call(this, sourceValue, target[key]);
 	} else {
 		//base case 3: source contains key not present in target; copy it
